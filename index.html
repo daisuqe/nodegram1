@@ -673,6 +673,14 @@ function drawNode(n){
   const d=NODE_TYPES[n.type];
   const tl=w2s(n.x-NS/2, n.y-NS/2);
   const w=NS*view.s, hh=NS*view.s;
+  // 端子（丸のみ）を本体より先に描画＝見た目はノードの後ろ（当たり判定は不変）
+  d.inputs.forEach((_,i)=> port(portPos(n,true,i),  "#ffffff"));
+  d.outputs.forEach((_,i)=>port(portPos(n,false,i), "#ffe08a"));
+  // 親子端子：上＝自分の親へつなぐ（子を持てるノード全て）／下＝子を受け入れる
+  if(canHaveParent(n)) port(parentPortPos(n), PARENT_COL);
+  const parentDrag = drag && drag.kind==="parentwire";
+  const isCand = parentDrag && isCandidateParent(nodeById(drag.node), n);
+  if(nodes.some(m=>m.parentNodeId===n.id) || isCand) port(childPortPos(n), isCand ? "#ffffff" : PARENT_COL);
   // 本体（正方形。オブジェクトはそのオブジェクト色、他はカテゴリ色で全面塗り）
   roundRect(tl.x,tl.y,w,hh,16*view.s);
   ctx.fillStyle = d.object ? n.color : d.color; ctx.fill();
@@ -686,14 +694,6 @@ function drawNode(n){
   ctx.textAlign="center"; ctx.textBaseline="middle";
   ctx.fillStyle="rgba(0,0,0,.4)"; ctx.fillText(g, cx+1.5, cy+1.5);
   ctx.fillStyle="#ffffff";        ctx.fillText(g, cx, cy);
-  // 端子（丸のみ）
-  d.inputs.forEach((_,i)=> port(portPos(n,true,i),  "#ffffff"));
-  d.outputs.forEach((_,i)=>port(portPos(n,false,i), "#ffe08a"));
-  // 親子端子：上＝自分の親へつなぐ（子を持てるノード全て）／下＝子を受け入れる
-  if(canHaveParent(n)) port(parentPortPos(n), PARENT_COL);
-  const parentDrag = drag && drag.kind==="parentwire";
-  const isCand = parentDrag && isCandidateParent(nodeById(drag.node), n);
-  if(nodes.some(m=>m.parentNodeId===n.id) || isCand) port(childPortPos(n), isCand ? "#ffffff" : PARENT_COL);
   // 選択中は端子ラベルをノードの外側に表示
   if(selected===n.id){
     ctx.font=`${Math.round(48*view.s)}px sans-serif`; // 端子ラベル3倍（太字にしない）

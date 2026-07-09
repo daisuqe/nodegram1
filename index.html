@@ -195,6 +195,7 @@ function glyphFontSize(g){ const L=[...String(g)].length;
 let nodes = [];              // {id,type,x,y,value,color,size,playX,playY,vx,vy}
 let conns = [];             // {a:nodeId, ao:outPort, b:nodeId, bi:inPort}
 let view = { x:0, y:0, s:1 };
+let layoutView = { x:0, y:0, s:1 };  // レイアウト画面のパン・ズーム
 let nextId = 1;
 let mode = "edit";          // "edit" | "layout" | "play"
 let editModeMemory = "edit"; // Play終了後に戻る画面（edit/layout）
@@ -216,6 +217,9 @@ resize();
 // ---- 座標変換 ----
 function w2s(wx,wy){ return { x:(wx-view.x)*view.s + W/2, y:(wy-view.y)*view.s + H/2 }; }
 function s2w(sx,sy){ return { x:(sx-W/2)/view.s + view.x, y:(sy-H/2)/view.s + view.y }; }
+// レイアウト画面：ステージ座標(=layoutX/Y) ↔ スクリーン
+function stageToScreenLayout(x,y){ return { x:(x-layoutView.x)*layoutView.s + W/2, y:(y-layoutView.y)*layoutView.s + H/2 }; }
+function screenToStageLayout(sx,sy){ return { x:(sx-W/2)/layoutView.s + layoutView.x, y:(sy-H/2)/layoutView.s + layoutView.y }; }
 
 // ---- ノード生成 ----
 function addNode(type, wx, wy){
@@ -390,7 +394,7 @@ function updatePlayBtnColor(){
 function setMode(m){ // edit ⇄ layout 切り替え
   if(mode==="play") return;
   mode=m; editModeMemory=m;
-  selected=null; propNode=null; hideCreateMenu(); refreshProp();
+  selected=null; multiSel.clear(); propNode=null; hideCreateMenu(); refreshProp();
   document.getElementById("hint").textContent = (m==="layout") ? "オブジェクトをドラッグして配置" : "矢印 / WASD で移動";
   document.getElementById("hint").classList.toggle("hidden", m!=="layout");
   updatePlayBtnColor();
@@ -545,7 +549,7 @@ function applyHierarchy(){
 // =====================================================================
 function draw(){
   ctx.clearRect(0,0,W,H);
-  if(mode==="edit"){ drawGrid(); drawWires(); drawParentWires(); nodes.forEach(drawNode); drawDragWire(); }
+  if(mode==="edit"){ drawGrid(); drawWires(); drawParentWires(); nodes.forEach(drawNode); drawDragWire(); drawSelBox(); }
   else if(mode==="layout") drawLayout();
   else if(mode==="texedit") drawTexEditor();
   else drawPlay();
@@ -594,6 +598,12 @@ function drawWires(){
     drawWire(portPos(a,false,c.ao), portPos(b,true,c.bi), "#7c8598");
   }
 }
+function drawSelBox(){
+  if(!drag || drag.kind!=="selbox") return;
+  const x=Math.min(drag.x0,drag.x1), y=Math.min(drag.y0,drag.y1), w=Math.abs(drag.x1-drag.x0), h=Math.abs(drag.y1-drag.y0);
+  ctx.fillStyle="rgba(0,180,255,.15)"; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle="#21b3d6"; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+}
 function drawDragWire(){
   if(!drag) return;
   if(drag.kind==="wire"){
@@ -613,8 +623,9 @@ function drawNode(n){
   // 本体（正方形。オブジェクトはそのオブジェクト色、他はカテゴリ色で全面塗り）
   roundRect(tl.x,tl.y,w,hh,16*view.s);
   ctx.fillStyle = d.object ? n.color : d.color; ctx.fill();
-  ctx.strokeStyle = (selected===n.id)?"#ffffff":"rgba(0,0,0,.4)";
-  ctx.lineWidth=(selected===n.id)?3:1.5; ctx.stroke();
+  const sel = (selected===n.id) || multiSel.has(n.id);
+  ctx.strokeStyle = sel?"#ffffff":"rgba(0,0,0,.4)";
+  ctx.lineWidth=sel?3:1.5; ctx.stroke();
   // 中央のシンボル（1〜3文字）をノードいっぱいに
   const g=nodeGlyph(n);
   const cx=tl.x+w/2, cy=tl.y+hh/2;
@@ -681,12 +692,15 @@ function drawObjShape(cx,cy,n,ang){
   }
   ctx.restore();
 }
-// オブジェクト中心（画面座標）
-function objCenter(n){ return { x:W/2+(n.layoutX||0), y:H/2+(n.layoutY||0) }; }
-// ローカル→画面 / 画面→ローカル（回転考慮）
-function objFromLocal(n,lx,ly){ const c=objCenter(n), a=(n.angle||0)*Math.PI/180;
-  return { x:c.x + lx*Math.cos(a)-ly*Math.sin(a), y:c.y + lx*Math.sin(a)+ly*Math.cos(a) }; }
-function objToLocal(n,sx,sy){ const c=objCenter(n), a=-(n.angle||0)*Math.PI/180, dx=sx-c.x, dy=sy-c.y;
+// オブジェクト中心（画面座標・レイアウトビュー反映）
+function objCenter(n){ return stageToScreenLayout(n.layoutX||0, n.layoutY||0); }
+// ローカル(ステージ単位)→画面
+function objFromLocal(n,lx,ly){ const a=(n.angle||0)*Math.PI/180;
+  const wx=(n.layoutX||0)+lx*Math.cos(a)-ly*Math.sin(a), wy=(n.layoutY||0)+lx*Math.sin(a)+ly*Math.cos(a);
+  return stageToScreenLayout(wx,wy); }
+// 画面→ローカル(ステージ単位・回転考慮)
+function objToLocal(n,sx,sy){ const p=screenToStageLayout(sx,sy), a=-(n.angle||0)*Math.PI/180;
+  const dx=p.x-(n.layoutX||0), dy=p.y-(n.layoutY||0);
   return { x:dx*Math.cos(a)-dy*Math.sin(a), y:dx*Math.sin(a)+dy*Math.cos(a) }; }
 
 // ステージ要素（オブジェクト/テキスト/スティック/ボタン/SHOT/ROTATE）を描画
@@ -722,48 +736,51 @@ function drawStage(cx,cy,n,ang){
 }
 
 function drawLayout(){
-  // ステージ（Play画面と同じ座標系）にオブジェクトを配置・ドラッグする画面
-  ctx.fillStyle="#0d1017"; ctx.fillRect(0,0,W,H);
+  // 外側（Play表示領域の外）
+  ctx.fillStyle="#0a0b10"; ctx.fillRect(0,0,W,H);
+  const S=layoutView.s;
+  ctx.save();
+  ctx.translate(W/2,H/2); ctx.scale(S,S); ctx.translate(-layoutView.x,-layoutView.y);
+  // Play表示領域（画面サイズ相当）を暗いグレーで（Unity版と同じ）
+  ctx.fillStyle="#20232b"; ctx.fillRect(-W/2,-H/2,W,H);
+  ctx.strokeStyle="#3a4150"; ctx.lineWidth=2/S; ctx.strokeRect(-W/2,-H/2,W,H);
   // 中央十字ガイド
-  ctx.strokeStyle="#1e2531"; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
-  // 重力ONオブジェクトがある場合は床の位置を表示
+  ctx.strokeStyle="#2a313d"; ctx.lineWidth=1/S;
+  ctx.beginPath(); ctx.moveTo(0,-H/2); ctx.lineTo(0,H/2); ctx.moveTo(-W/2,0); ctx.lineTo(W/2,0); ctx.stroke();
+  // 床の位置（重力ONオブジェクトがある場合）
   if(nodes.some(n=>NODE_TYPES[n.type].object && n.dyn)){
-    const fy=H-40; ctx.fillStyle="#20252f"; ctx.fillRect(0,fy,W,H-fy);
-    ctx.strokeStyle="#3a4150"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,fy); ctx.lineTo(W,fy); ctx.stroke();
+    const fy=H/2-40; ctx.strokeStyle="#3a4150"; ctx.lineWidth=2/S;
+    ctx.beginPath(); ctx.moveTo(-W/2,fy); ctx.lineTo(W/2,fy); ctx.stroke();
   }
-  for(const n of nodes){
-    if(!isStage(n)) continue;
-    const c=objCenter(n);
-    drawStage(c.x,c.y,n);
-    if(selected===n.id) drawHandles(n);
-  }
+  // ステージ要素（ステージ座標で描画）
+  for(const n of nodes){ if(!isStage(n)) continue; drawStage(n.layoutX||0, n.layoutY||0, n); }
+  ctx.restore();
+  // ハンドル（スクリーン空間）
+  for(const n of nodes){ if(isStage(n) && selected===n.id) drawHandles(n); }
   if(!nodes.some(isStage)){
     ctx.fillStyle="#5a6270"; ctx.font="20px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText("Editor で TEXT / RECT / STICK などを作るとここに配置できます", W/2, H/2-40);
+    ctx.fillText("画面長押しでノードを選択してください", W/2, H/2-40);
   }
 }
 // 選択オブジェクトのハンドル（四隅=リサイズ、上=回転）
 const HANDLE_R=15;
 function handlePositions(n){
   const hw=(n.w||80)/2, hh=(n.h||80)/2;
+  const a=(n.angle||0)*Math.PI/180, c=objCenter(n), d=hh*layoutView.s+40;
   return {
     corners:[ objFromLocal(n,-hw,-hh), objFromLocal(n,hw,-hh), objFromLocal(n,-hw,hh), objFromLocal(n,hw,hh) ],
-    rot: objFromLocal(n, 0, -hh-40)
+    rot: { x:c.x + d*Math.sin(a), y:c.y - d*Math.cos(a) }
   };
 }
 function drawHandles(n){
   const hp=handlePositions(n);
-  // 枠
-  const hw=(n.w||80)/2, hh=(n.h||80)/2;
+  const hw=(n.w||80)/2*layoutView.s, hh=(n.h||80)/2*layoutView.s;
   ctx.save(); ctx.translate(objCenter(n).x,objCenter(n).y); ctx.rotate((n.angle||0)*Math.PI/180);
   ctx.strokeStyle="#7fdcff"; ctx.lineWidth=2; ctx.strokeRect(-hw,-hh,hw*2,hh*2);
   ctx.beginPath(); ctx.moveTo(0,-hh); ctx.lineTo(0,-hh-40); ctx.stroke(); // 回転レバー
   ctx.restore();
-  // 四隅ハンドル
   ctx.fillStyle="#ffffff"; ctx.strokeStyle="#21b3d6"; ctx.lineWidth=2;
   for(const c of hp.corners){ ctx.beginPath(); ctx.rect(c.x-HANDLE_R,c.y-HANDLE_R,HANDLE_R*2,HANDLE_R*2); ctx.fill(); ctx.stroke(); }
-  // 回転ハンドル
   ctx.beginPath(); ctx.arc(hp.rot.x,hp.rot.y,HANDLE_R,0,7); ctx.fillStyle="#7fdcff"; ctx.fill(); ctx.stroke();
 }
 
@@ -799,6 +816,8 @@ function drawPlay(){
 // =====================================================================
 let drag=null;       // {kind:'node'|'pan'|'wire', ...}
 let selected=null;
+let multiSel=new Set();   // 矩形選択された複数ノード（Editor）
+let lastBgDown=0, lastBgPos={x:0,y:0};
 let pointerMoved=false;
 
 function hitPort(sx,sy){
@@ -857,11 +876,15 @@ function onDown(sx,sy){
     const n=hitLayoutObject(sx,sy);
     if(n){
       selected=n.id;
-      drag={kind:"layout", node:n.id, dx:(n.layoutX||0)-(sx-W/2), dy:(n.layoutY||0)-(sy-H/2)};
+      const p=screenToStageLayout(sx,sy);
+      drag={kind:"layout", node:n.id, dx:(n.layoutX||0)-p.x, dy:(n.layoutY||0)-p.y};
       // 長押し → Property
       lpX=sx; lpY=sy; cancelLongPress();
       const nid=n.id; lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; openProp(nid); }, 450);
-    } else { selected=null; propNode=null; refreshProp(); }
+    } else {
+      selected=null; propNode=null; refreshProp();
+      drag={kind:"layoutpan", sx, sy, vx:layoutView.x, vy:layoutView.y}; // 背景ドラッグでビュー移動
+    }
     return;
   }
   if(mode!=="edit") return;
@@ -879,6 +902,12 @@ function onDown(sx,sy){
   }
   const hn=hitNode(sx,sy);
   if(hn){
+    if(multiSel.has(hn.node)){ // 複数選択をまとめて移動
+      const wp=s2w(sx,sy);
+      drag={kind:"nodegroup", items:[...multiSel].map(id=>{const nn=nodeById(id); return {id, dx:nn.x-wp.x, dy:nn.y-wp.y};})};
+      return;
+    }
+    multiSel.clear();
     selected=hn.node;
     const n=nodeById(hn.node);
     drag={kind:"node", node:hn.node, dx:n.x-s2w(sx,sy).x, dy:n.y-s2w(sx,sy).y};
@@ -888,7 +917,13 @@ function onDown(sx,sy){
     lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; openProp(nid); }, 450);
     return;
   }
-  selected=null; propNode=null; refreshProp(); // 背景タップでProperty閉じる
+  // 背景：ダブルクリックからのドラッグ＝矩形範囲選択
+  const now=performance.now();
+  const isDbl=(now-lastBgDown<350)&&Math.hypot(sx-lastBgPos.x,sy-lastBgPos.y)<30;
+  lastBgDown=now; lastBgPos={x:sx,y:sy};
+  selected=null; propNode=null; refreshProp();
+  if(isDbl){ cancelLongPress(); multiSel.clear(); drag={kind:"selbox", x0:sx, y0:sy, x1:sx, y1:sy}; return; }
+  multiSel.clear();
   drag={kind:"pan", sx, sy, vx:view.x, vy:view.y};
   // 背景長押し → Create New Node メニュー
   lpX=sx; lpY=sy; cancelLongPress();
@@ -900,11 +935,15 @@ function onMove(sx,sy){
   pointerMoved=true;
   if(drag.kind==="pan"){ view.x=drag.vx-(sx-drag.sx)/view.s; view.y=drag.vy-(sy-drag.sy)/view.s; }
   else if(drag.kind==="node"){ const wp=s2w(sx,sy); const n=nodeById(drag.node); if(n){ n.x=wp.x+drag.dx; n.y=wp.y+drag.dy; } }
+  else if(drag.kind==="nodegroup"){ const wp=s2w(sx,sy); for(const it of drag.items){ const n=nodeById(it.id); if(n){ n.x=wp.x+it.dx; n.y=wp.y+it.dy; } } }
+  else if(drag.kind==="selbox"){ drag.x1=sx; drag.y1=sy; }
   else if(drag.kind==="layout"){ const n=nodeById(drag.node); if(n){
-    n.layoutX=(sx-W/2)+drag.dx; n.layoutY=(sy-H/2)+drag.dy;
+    const p=screenToStageLayout(sx,sy);
+    n.layoutX=p.x+drag.dx; n.layoutY=p.y+drag.dy;
     if(n.parentNodeId) recomputeLocal(n);  // 親に対する相対を更新
     updateSubtreeWorld(n);                 // 子孫を追従
   } }
+  else if(drag.kind==="layoutpan"){ layoutView.x=drag.vx-(sx-drag.sx)/layoutView.s; layoutView.y=drag.vy-(sy-drag.sy)/layoutView.s; }
   else if(drag.kind==="resize"){ const n=nodeById(drag.node); if(n){ const l=objToLocal(n,sx,sy);
     n.w=Math.max(16,Math.round(Math.abs(l.x)*2)); n.h=Math.max(16,Math.round(Math.abs(l.y)*2)); } }
   else if(drag.kind==="rotate"){ const n=nodeById(drag.node); if(n){ const c=objCenter(n);
@@ -931,6 +970,12 @@ function onUp(sx,sy){
       const inBody = sx>=tl.x&&sx<=tl.x+w&&sy>=tl.y&&sy<=tl.y+w;
       if(nearPort||inBody){ target=p; break; } }
     if(child){ child.parentNodeId = target ? target.id : null; if(target) recomputeLocal(child); } // 空きで離すと解除
+  }
+  if(drag && drag.kind==="selbox"){
+    const x0=Math.min(drag.x0,drag.x1), x1=Math.max(drag.x0,drag.x1);
+    const y0=Math.min(drag.y0,drag.y1), y1=Math.max(drag.y0,drag.y1);
+    multiSel.clear();
+    for(const n of nodes){ const p=w2s(n.x,n.y); if(p.x>=x0&&p.x<=x1&&p.y>=y0&&p.y<=y1) multiSel.add(n.id); }
   }
   drag=null;
 }
@@ -1010,26 +1055,56 @@ document.querySelectorAll("#texTools [data-sz]").forEach(b=> b.onclick=()=>{ con
 document.getElementById("texClear").onclick=()=>{ const n=nodeById(texEditNode); if(n) n.pixels=new Array((n.texW||16)*(n.texH||16)).fill(null); };
 document.getElementById("texClose").onclick=closeTexEditor;
 
-// pointer events
+// pointer events（Editor/Layout は2本指ピンチでズーム＆パン）
+const ptrs=new Map(); let pinchPrev=null;
+function activeView(){ return mode==="layout"?layoutView:view; }
+function doPinch(){
+  const pts=[...ptrs.values()]; if(pts.length<2) return;
+  const a=pts[0], b=pts[1];
+  const dist=Math.hypot(a.x-b.x,a.y-b.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+  if(pinchPrev){
+    const V=activeView(); const minS=(mode==="layout")?0.15:0.3;
+    const bx=(mx-W/2)/V.s+V.x, by=(my-H/2)/V.s+V.y;
+    V.s=Math.min(3,Math.max(minS, V.s*(dist/pinchPrev.dist)));
+    const ax=(mx-W/2)/V.s+V.x, ay=(my-H/2)/V.s+V.y;
+    V.x+=bx-ax; V.y+=by-ay;                         // ピンチ中心を固定
+    V.x-=(mx-pinchPrev.mx)/V.s; V.y-=(my-pinchPrev.my)/V.s; // 2本指の移動でパン
+  }
+  pinchPrev={dist,mx,my};
+}
 cv.addEventListener("pointerdown", e=>{ cv.setPointerCapture(e.pointerId);
   if(mode==="play"){ playDown(e.pointerId,e.clientX,e.clientY); return; }
   if(mode==="texedit"){ texPressed=true; texPaint(e.clientX,e.clientY); return; }
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if((mode==="edit"||mode==="layout") && ptrs.size>=2){ drag=null; cancelLongPress(); pinchPrev=null; return; }
   onDown(e.clientX,e.clientY); });
 cv.addEventListener("pointermove", e=>{
   if(mode==="play"){ playMove(e.pointerId,e.clientX,e.clientY); return; }
   if(mode==="texedit"){ if(texPressed) texPaint(e.clientX,e.clientY); return; }
+  if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if((mode==="edit"||mode==="layout") && ptrs.size>=2){ doPinch(); return; }
   onMove(e.clientX,e.clientY); });
 cv.addEventListener("pointerup",   e=>{
   if(mode==="play"){ playUp(e.pointerId); return; }
   if(mode==="texedit"){ texPressed=false; return; }
+  ptrs.delete(e.pointerId); pinchPrev=null;
   onUp(e.clientX,e.clientY); });
-cv.addEventListener("pointercancel", e=>{ if(mode==="play"){ playUp(e.pointerId); return; } texPressed=false; drag=null; cancelLongPress();});
-// wheel zoom
-cv.addEventListener("wheel", e=>{ e.preventDefault(); if(mode!=="edit") return;
-  const before=s2w(e.clientX,e.clientY);
-  view.s *= (e.deltaY<0?1.1:0.9); view.s=Math.min(3,Math.max(0.3,view.s));
-  const after=s2w(e.clientX,e.clientY);
-  view.x+=before.x-after.x; view.y+=before.y-after.y;
+cv.addEventListener("pointercancel", e=>{ ptrs.delete(e.pointerId); pinchPrev=null;
+  if(mode==="play"){ playUp(e.pointerId); return; } texPressed=false; drag=null; cancelLongPress();});
+// wheel zoom（Editor と Layout）
+cv.addEventListener("wheel", e=>{ e.preventDefault();
+  const f = e.deltaY<0?1.1:0.9;
+  if(mode==="edit"){
+    const before=s2w(e.clientX,e.clientY);
+    view.s=Math.min(3,Math.max(0.3,view.s*f));
+    const after=s2w(e.clientX,e.clientY);
+    view.x+=before.x-after.x; view.y+=before.y-after.y;
+  } else if(mode==="layout"){
+    const before=screenToStageLayout(e.clientX,e.clientY);
+    layoutView.s=Math.min(3,Math.max(0.15,layoutView.s*f));
+    const after=screenToStageLayout(e.clientX,e.clientY);
+    layoutView.x+=before.x-after.x; layoutView.y+=before.y-after.y;
+  }
 },{passive:false});
 
 // =====================================================================
@@ -1040,7 +1115,10 @@ let heldKeys=new Set();  // KEYBOARDノード/ボタン用：押下中のキー(
 const KMAP={ArrowUp:"U",ArrowDown:"D",ArrowLeft:"L",ArrowRight:"R",w:"U",s:"D",a:"L",d:"R",W:"U",S:"D",A:"L",D:"R"};
 window.addEventListener("keydown", e=>{ const k=KMAP[e.key]; if(k){ keys[k]=true; e.preventDefault(); }
   heldKeys.add(e.key.toLowerCase());
-  if((e.key==="Delete"||e.key==="Backspace") && selected && mode==="edit"){ removeNode(selected); selected=null; } });
+  if((e.key==="Delete"||e.key==="Backspace") && mode==="edit"){
+    if(multiSel.size){ [...multiSel].forEach(id=>removeNode(id)); multiSel.clear(); selected=null; }
+    else if(selected){ removeNode(selected); selected=null; }
+  } });
 window.addEventListener("keyup", e=>{ const k=KMAP[e.key]; if(k) keys[k]=false; heldKeys.delete(e.key.toLowerCase()); });
 // TOUCHノード用グローバル状態（Play中のポインタ）
 let touchX=0, touchY=0, touchDown=0;

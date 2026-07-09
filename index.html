@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#12141a">
+<title>nodegram web</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#12141a;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+    user-select:none; -webkit-user-select:none; touch-action:none; }
+  #app { position:fixed; inset:0; }
+  #cv { position:absolute; inset:0; display:block; }
+
+  /* 右上コントローラ（▶ / MENU） */
+  .cbtn { position:absolute; right:14px; width:72px; height:72px; border-radius:14px; z-index:12;
+    display:flex; align-items:center; justify-content:center; font-weight:800; cursor:pointer;
+    border:1px solid rgba(0,0,0,.35); user-select:none; }
+  .cplay { top:14px; background:#1f7a3a; color:#fff; font-size:34px; }
+  .cplay.stop { background:#a12b2b; }
+  .cmenu { top:98px; background:#3b4250; color:#dff2ff; font-size:19px; letter-spacing:.03em; }
+  .cmenu:active { background:#4a5262; }
+  #flick { position:absolute; inset:0; z-index:11; display:none; }
+  #flick .fi { position:absolute; width:150px; height:60px; border-radius:12px; display:flex; align-items:center;
+    justify-content:center; font-size:20px; font-weight:800; color:#fff; border:2px solid rgba(255,255,255,.25);
+    background:#2b3140; box-shadow:0 6px 20px rgba(0,0,0,.5); }
+  #flick .fi.hot { border-color:#fff; transform:scale(1.08); }
+  .swatch { width:16px; height:16px; border-radius:4px; display:inline-block; margin-right:8px; vertical-align:-2px; }
+
+  /* 再生中のオンスクリーン操作 */
+  #pad { position:absolute; left:14px; bottom:14px; width:150px; height:150px; z-index:9; display:none;
+    touch-action:none; }
+  #pad .k { position:absolute; width:48px; height:48px; border-radius:10px; background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.25); }
+  #pad .up{left:51px;top:0} #pad .down{left:51px;bottom:0} #pad .left{left:0;top:51px} #pad .right{right:0;top:51px}
+  #hint { position:absolute; right:10px; bottom:10px; color:#8a92a6; font-size:12px; z-index:9; }
+  .hidden { display:none !important; }
+
+  /* テクスチャエディタ */
+  #texBar { position:absolute; left:0; right:0; bottom:0; z-index:16; background:rgba(20,22,30,.96);
+    border-top:1px solid #2a2e3a; padding:10px; display:none; }
+  #texPalette { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:10px; }
+  #texPalette .sw { width:40px; height:40px; border-radius:8px; border:2px solid #3a4150; cursor:pointer; }
+  #texPalette .sw.sel { border-color:#fff; transform:scale(1.12); }
+  #texPalette .sw.eraser { background:repeating-conic-gradient(#555 0% 25%, #888 0% 50%) 50%/14px 14px; }
+  #texTools { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  #texTools .btn { height:44px; padding:0 16px; border-radius:10px; border:1px solid #333a49;
+    background:#242a37; color:#e6e9ef; font-size:15px; font-weight:700; cursor:pointer; }
+  #texTools .btn:active { background:#2f3646; }
+
+  /* 背景長押しの Create New Node メニュー */
+  #createMenu { position:absolute; z-index:20; background:rgba(28,32,42,.98); border:1px solid #3a4150;
+    border-radius:14px; padding:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.6);
+    max-height:calc(100vh - 24px); overflow-y:auto; }
+  #createMenu .title { color:#8a92a6; font-size:13px; font-weight:800; padding:2px 4px 10px; letter-spacing:.05em; }
+  #createMenu .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  #createMenu .ci { height:56px; padding:0 16px; border-radius:12px; border:1px solid #333a49; background:#242a37;
+    color:#e6e9ef; font-size:17px; font-weight:800; cursor:pointer; display:flex; align-items:center; }
+  #createMenu .ci:active { background:#2f3646; }
+
+  /* プロパティパネル（選択ノード） */
+  #propPanel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:15;
+    background:rgba(28,32,42,.98); border:1px solid #3a4150; border-radius:14px; padding:16px 18px; display:none;
+    min-width:240px; box-shadow:0 12px 36px rgba(0,0,0,.6); }
+  #propPanel .pt { color:#fff; font-size:17px; font-weight:800; margin-bottom:10px; display:flex; align-items:center; }
+  #propPanel .pclose { margin-left:auto; width:34px; height:34px; border-radius:8px; border:1px solid #3a4150;
+    background:#2a3040; color:#fff; font-size:20px; font-weight:800; cursor:pointer; line-height:1; }
+  #propPanel .pclose:active { background:#3a4150; }
+  #propPanel .prow { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  #propPanel label { color:#9aa3b5; font-size:13px; font-weight:700; }
+  #propPanel input { flex:1; width:110px; height:44px; border-radius:9px; border:1px solid #3a4150; background:#181c26;
+    color:#e6e9ef; font-size:18px; font-weight:700; text-align:center; }
+  #propPanel input[type=checkbox] { flex:0 0 auto; width:32px; height:32px; }
+  #propPanel select { flex:1; height:44px; border-radius:9px; border:1px solid #3a4150; background:#181c26;
+    color:#e6e9ef; font-size:16px; font-weight:700; }
+  #propPanel .del { width:100%; height:48px; border-radius:10px; border:1px solid #cc3b3b; background:#a12b2b;
+    color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
+  #propPanel .del:active { background:#cc3b3b; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv"></canvas>
+
+  <!-- 右上のコントローラ（元デザイン準拠：▶ と MENU） -->
+  <div id="playBtn" class="cbtn cplay">▶</div>
+  <div id="menuBtn" class="cbtn cmenu">MENU</div>
+  <div id="flick"></div>
+
+  <div id="pad">
+    <div class="k up"    data-d="U"></div>
+    <div class="k down"  data-d="D"></div>
+    <div class="k left"  data-d="L"></div>
+    <div class="k right" data-d="R"></div>
+  </div>
+  <div id="hint" class="hidden">矢印 / WASD で移動</div>
+
+  <div id="createMenu"></div>
+  <div id="propPanel"></div>
+
+  <!-- テクスチャエディタのツールバー -->
+  <div id="texBar">
+    <div id="texPalette"></div>
+    <div id="texTools">
+      <button class="btn" data-sz="8">8</button>
+      <button class="btn" data-sz="16">16</button>
+      <button class="btn" data-sz="32">32</button>
+      <button class="btn" id="texClear">CLEAR</button>
+      <button class="btn" id="texClose">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// =====================================================================
+//  nodegram (web prototype)  — Unityを使わないHTML版の骨組み
+//  ・ノード編集：追加 / 移動 / 端子ドラッグで接続 / ×で削除 / 値編集
+//  ・再生：ノードグラフを毎フレーム評価してオブジェクトを動かす
+//  Canvas2Dのみ。外部ライブラリなし。1ファイルで動作。
+// =====================================================================
+
+// ---- ノード種別の定義（色は元nodegramのカテゴリ配色に対応）----
+const NODE_TYPES = {
+  const:  { label:"CONST",  glyph:"",     inputs:[],              outputs:["n"],     color:"#3aae4a" }, // 緑：入力/定数
+  // 操作系（橙）
+  stick:   { label:"STICK",    glyph:"STK",  inputs:[], outputs:["X","Y"],   color:"#e0892b", stage:"stick"  },
+  button:  { label:"BUTTON",   glyph:"BTN",  inputs:[], outputs:["="],       color:"#e0892b", stage:"button" },
+  keyboard:{ label:"KEYBOARD", glyph:"KBD",  inputs:[], outputs:["="],       color:"#e0892b" },
+  touch:   { label:"TOUCH",    glyph:"TCH",  inputs:[], outputs:["X","Y","P"], color:"#e0892b" },
+  // 計算系（青）
+  add:    { label:"PLUS",    glyph:"＋",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  sub:    { label:"MINUS",   glyph:"－",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  mul:    { label:"MULT",    glyph:"×",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  div:    { label:"DIV",     glyph:"÷",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  root:   { label:"ROOT",    glyph:"√",    inputs:["x"],     outputs:["="], color:"#3b7ddd" },
+  compare:{ label:"COMPARE", glyph:"＞",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  not:    { label:"NOT",     glyph:"！",   inputs:["x"],     outputs:["="], color:"#3b7ddd" },
+  arctan: { label:"ARCTAN",  glyph:"atan", inputs:["y","x"], outputs:["="], color:"#3b7ddd" },
+  angletopos:{ label:"ANGLE→POS", glyph:"A→P", inputs:["a"], outputs:["X","Y"], color:"#3b7ddd" },
+  random: { label:"RANDOM",  glyph:"RND",  inputs:[],        outputs:["="], color:"#3b7ddd" },
+  int:    { label:"INT",     glyph:"INT",  inputs:["x"],     outputs:["="], color:"#3b7ddd" },
+  // 応用計算系（水色）
+  trigger:{ label:"TRIGGER", glyph:"DLY", inputs:["in","F"],      outputs:["="],     color:"#22b8c0" },
+  counter:{ label:"COUNTER", glyph:"CNT", inputs:["up","rst"],    outputs:["="],     color:"#22b8c0" },
+  var:    { label:"VAR",     glyph:"VAR", inputs:["val","set"],   outputs:["="],     color:"#22b8c0" },
+  array:  { label:"ARRAY",   glyph:"ARR", inputs:["i","val","wr"],outputs:["="],     color:"#22b8c0" },
+  getpos: { label:"GETPOS",  glyph:"GPS", inputs:[],              outputs:["X","Y"], color:"#22b8c0", target:true },
+  getrot: { label:"GETROT",  glyph:"GRT", inputs:[],              outputs:["R"],     color:"#22b8c0", target:true },
+  // 出力系（紫）
+  text:     { label:"TEXT",   glyph:"T",    inputs:["val"],       outputs:[], color:"#8a3bd0", stage:"text"   },
+  rect:     { label:"RECT",   glyph:"▭",   inputs:["vx","vy"],   outputs:[], color:"#8a3bd0", object:"rect"  },
+  circle:   { label:"CIRCLE", glyph:"〇",   inputs:["vx","vy"],   outputs:[], color:"#8a3bd0", object:"circle"},
+  character:{ label:"CHARACTER", glyph:"CHR", inputs:["vx","vy"], outputs:[], color:"#8a3bd0", object:"rect"  },
+  shot:     { label:"SHOT",   glyph:"SHOT", inputs:["fire","spd"],outputs:[], color:"#8a3bd0", stage:"shot"   },
+  sound:    { label:"SOUND",  glyph:"SND",  inputs:["play"],      outputs:[], color:"#8a3bd0" },
+  // その他（黄）
+  texture:  { label:"TEXTURE",glyph:"TEX",  inputs:["V"],         outputs:[], color:"#e0c020", tex:true },
+  contact:  { label:"CONTACT",glyph:"CON",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
+  onbreak:  { label:"ONBREAK",glyph:"BRK",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
+  rotate:   { label:"ROTATE", glyph:"ROT",  inputs:["av"],        outputs:[], color:"#e0c020", stage:"rotate" },
+  velocity: { label:"VELOCITY",glyph:"VEL", inputs:[],            outputs:["X","Y"], color:"#e0c020", target:true },
+  screen:   { label:"SCREEN", glyph:"SCR",  inputs:[],            outputs:[], color:"#e0c020", target:true },
+  // シーン設定（灰）
+  bg:       { label:"BG",     glyph:"BG",   inputs:[],            outputs:[], color:"#6b7280" },
+  setting:  { label:"SETTING",glyph:"SET",  inputs:[],            outputs:[], color:"#6b7280" },
+};
+const isStage = n => { const d=NODE_TYPES[n.type]; return !!(d.object || d.stage); };
+const attachesToObject = n => ['texture','contact','onbreak'].includes(n.type);
+const PALETTE = ["const",
+  "stick","button","keyboard","touch",
+  "add","sub","mul","div","root","compare","not","arctan","angletopos","random","int",
+  "trigger","counter","var","array","getpos","getrot",
+  "text","rect","circle","character","shot","sound",
+  "texture","contact","onbreak","rotate","velocity","screen",
+  "bg","setting"];
+
+// ---- ノードの見た目サイズ（ワールド座標）。元デザイン同様の正方形ノード ----
+const NS = 130, PORT_R = 20; // 端子を1.3倍に
+function nodeHeight(t){ return NS; }
+// ノードに表示する1〜3文字（元nodegramのシンボル表示に対応）
+function nodeGlyph(n){
+  if(n.type==="const") return String(n.value);
+  const d=NODE_TYPES[n.type];
+  return (d && (d.glyph||d.label)) || "?";
+}
+function glyphFontSize(g){ const L=[...String(g)].length;
+  return (L<=1?0.84 : L===2?0.62 : L===3?0.48 : 0.36) * NS; } // 約1.4倍に拡大
+
+// ---- 状態 ----
+let nodes = [];              // {id,type,x,y,value,color,size,playX,playY,vx,vy}
+let conns = [];             // {a:nodeId, ao:outPort, b:nodeId, bi:inPort}
+let view = { x:0, y:0, s:1 };
+let nextId = 1;
+let mode = "edit";          // "edit" | "layout" | "play"
+let editModeMemory = "edit"; // Play終了後に戻る画面（edit/layout）
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+let W=0, H=0, DPR=1;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W*DPR; cv.height = H*DPR;
+  cv.style.width = W+"px"; cv.style.height = H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ---- 座標変換 ----
+function w2s(wx,wy){ return { x:(wx-view.x)*view.s + W/2, y:(wy-view.y)*view.s + H/2 }; }
+function s2w(sx,sy){ return { x:(sx-W/2)/view.s + view.x, y:(sy-H/2)/view.s + view.y }; }
+
+// ---- ノード生成 ----
+function addNode(type, wx, wy){
+  const d = NODE_TYPES[type];
+  const n = { id: nextId++, type, x:wx, y:wy };
+  if (type==="const") n.value = 200;
+  if (d.object || d.stage){
+    n.angle=0; n.playX=0; n.playY=0;
+    if(d.object){ n.color=randObjColor(); n.w=80; n.h=80; }
+    else if(d.stage==="text"){ n.color="#8a3bd0"; n.w=240; n.h=70; n.text="TEXT"; n.fontSize=40; }
+    else if(d.stage==="stick"){ n.color="#e0892b"; n.w=200; n.h=200;
+      n.mode="analog"; n.threshold=0.3; n.limitAxis=false; n.useKey=false; n.visible=true; }
+    else if(d.stage==="button"){ n.color="#e0892b"; n.w=150; n.h=150;
+      n.output="momentary"; n.useKey=false; n.visible=true; }
+    else if(d.stage==="shot"){ n.color="#c084fc"; n.w=70; n.h=70; n.angle=0; }
+    else if(d.stage==="rotate"){ n.color="#e0c020"; n.w=70; n.h=70; }
+    if(type==="character"){ n.color=randObjColor(); }
+    // レイアウト開始位置（重ならないよう少しずらす）
+    const oc = nodes.filter(m=>isStage(m)).length;
+    n.layoutX = (oc%5)*100 - 200; n.layoutY = Math.floor(oc/5)*100 - 100;
+    n.parentNodeId = null; // 親子構造
+  }
+  if (d.tex){ n.texW=16; n.texH=16; n.pixels=new Array(16*16).fill(null); n.parentNodeId=null; }
+  if (d.attach){ n.parentNodeId=null; }
+  if (type==="keyboard"){ n.keyCode=" "; }             // 既定：スペース
+  if (type==="sound"){ n.pitch=440; }                  // 音の高さ
+  if (type==="bg"){ n.color="#0a0b10"; }               // 背景色
+  if (type==="setting"){ n.gravity=2200; }             // 重力の強さ
+  nodes.push(n);
+  return n;
+}
+function randObjColor(){
+  const c=["#ff5a5a","#ffb43a","#3ad0ff","#4ade80","#c084fc","#f472b6"];
+  return c[(nodes.length)%c.length];
+}
+const nodeById = id => nodes.find(n=>n.id===id);
+
+// ---- 端子のスクリーン座標 ----
+function portPos(n, isInput, idx){
+  const d = NODE_TYPES[n.type];
+  const cnt = (isInput ? d.inputs.length : d.outputs.length);
+  const top = n.y - NS/2;
+  // 辺上に配置。複数端子は上下に大きく離す（0.14〜0.86の範囲に展開）
+  let py;
+  if(cnt<=1) py = top + NS/2;
+  else py = top + NS*0.24 + idx*(NS*0.52/(cnt-1));
+  const px = isInput ? (n.x - NS/2) : (n.x + NS/2);
+  return w2s(px, py);
+}
+
+// ---- 接続 ----
+function connect(aId, aOut, bId, bIn){
+  if (aId===bId) return;
+  conns = conns.filter(c=>!(c.b===bId && c.bi===bIn)); // 入力は1本まで
+  conns.push({ a:aId, ao:aOut, b:bId, bi:bIn });
+}
+function disconnectInput(bId, bIn){ conns = conns.filter(c=>!(c.b===bId && c.bi===bIn)); }
+function removeNode(id){
+  nodes = nodes.filter(n=>n.id!==id);
+  conns = conns.filter(c=>c.a!==id && c.b!==id);
+  nodes.forEach(n=>{ if(n.parentNodeId===id) n.parentNodeId=null; if(n.target===id) n.target=null; });
+}
+let bullets=[];            // SHOTの弾
+let playCam={x:0,y:0};     // SCREENのカメラ
+
+// =====================================================================
+//  エンジン（評価）
+// =====================================================================
+let axisX=0, axisY=0;   // KEY入力（-1..1）
+function inputValue(node, port, seen){
+  const c = conns.find(c=>c.b===node.id && c.bi===port);
+  if(!c) return 0;
+  const src = nodeById(c.a);
+  if(!src) return 0;
+  return outputValue(src, c.ao, seen);
+}
+function outputValue(node, port, seen){
+  seen = seen || new Set();
+  if (seen.has(node.id)) return 0;     // 循環ガード
+  seen.add(node.id);
+  const a=()=>inputValue(node,0,seen), b=()=>inputValue(node,1,seen);
+  switch(node.type){
+    case "const":   return node.value||0;
+    case "key":     return port===0 ? axisX : axisY;
+    case "stick": {
+      let x=node.stickX||0, y=node.stickY||0;
+      if(node.useKey){ x+=(keys.R?1:0)-(keys.L?1:0); y+=(keys.D?1:0)-(keys.U?1:0);
+        x=Math.max(-1,Math.min(1,x)); y=Math.max(-1,Math.min(1,y)); }
+      if(node.limitAxis){ if(Math.abs(x)>=Math.abs(y)) y=0; else x=0; }
+      if(node.mode==="digital"){ const th=node.threshold||0.3;
+        x = x>th?1:(x<-th?-1:0); y = y>th?1:(y<-th?-1:0); }
+      return port===0 ? x : y;
+    }
+    case "button": {
+      const phys = (node.pressed?1:0) || (node.useKey && heldKeys.has(" ") ? 1:0);
+      if(node.output==="toggle") return node.toggleState?1:0;
+      if(node.output==="pulse")  return node.pulseOut?1:0;
+      return phys?1:0;
+    }
+    case "keyboard": return heldKeys.has((node.keyCode||" ")) ? 1 : 0;
+    case "touch":    return port===0 ? touchX : (port===1 ? touchY : touchDown);
+    // 計算系（青）
+    case "add":     return a()+b();
+    case "sub":     return a()-b();
+    case "mul":     return a()*b();
+    case "div":     { const d=b(); return d!==0 ? a()/d : 0; }
+    case "root":    { const v=a(); return v>0 ? Math.sqrt(v) : 0; }
+    case "compare": return a()>b() ? 1 : 0;
+    case "not":     return a()===0 ? 1 : 0;
+    case "arctan":  return Math.atan2(a(), b())*180/Math.PI;
+    case "angletopos": { const r=a()*Math.PI/180; return port===0 ? Math.cos(r) : Math.sin(r); }
+    case "random":  return node.rnd||0;
+    case "int":     return Math.floor(a());
+    // 応用計算系（水色）
+    case "trigger": return node.pulse||0;
+    case "counter": return node.cnt||0;
+    case "var":     return node.store||0;
+    case "array":   { const arr=node.arr||[]; return arr[Math.floor(a())]||0; }
+    case "getpos":  { const t=nodeById(node.target); if(!t) return 0; return port===0 ? (t.playX||0) : (t.playY||0); }
+    case "getrot":  { const t=nodeById(node.target); return t ? (t.playAngle!=null?t.playAngle:(t.angle||0)) : 0; }
+    // その他（黄）
+    case "velocity":{ const t=nodeById(node.target); if(!t) return 0; return port===0 ? (t._vx||0) : (t._vy||0); }
+    case "contact": { const p=nodeById(node.parentNodeId); if(!p) return 0;
+      for(const o of nodes){ if(o.id===p.id) continue; if(!NODE_TYPES[o.type].object) continue; if(overlapAABB(p,o)) return 1; } return 0; }
+    case "onbreak": return node.pulseBrk||0;
+  }
+  return 0;
+}
+
+function startPlay(){
+  if(mode==="edit"||mode==="layout") editModeMemory=mode;
+  mode="play";
+  // レイアウトで置いた位置から開始 & 状態ノードをリセット
+  nodes.forEach(n=>{
+    if(isStage(n)){ n.playX=n.layoutX||0; n.playY=n.layoutY||0; n.vy=0; n.grounded=false;
+      n.playAngle=n.angle||0; n._lastX=n.playX; n._lastY=n.playY; n._vx=0; n._vy=0; }
+    if(n.type==="stick"){ n.stickX=0; n.stickY=0; n.stickPid=null; }
+    if(n.type==="button"){ n.pressed=0; n.btnPid=null; n.toggleState=false; n.pulseOut=0; n._prev=0; }
+    if(n.type==="shot"){ n._prevFire=0; }
+    if(n.type==="sound"){ n._prevPlay=0; }
+    if(n.type==="onbreak"){ n.pulseBrk=0; }
+    if(n.type==="counter") n.cnt=0;
+    if(n.type==="var") n.store=0;
+    if(n.type==="array") n.arr=[];
+    if(n.type==="trigger"){ n._prevSig=0; n._delay=-1; n.pulse=0; }
+    if(n.type==="random") n.rnd=0;
+  });
+  bullets=[]; playCam={x:0,y:0};
+  touchX=0; touchY=0; touchDown=0;
+  try{ if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(_audioCtx.state==="suspended") _audioCtx.resume(); }catch(e){} // 実機の音声許可
+  // 親子ローカル座標を確定（Play中の追従に使用）
+  nodes.forEach(n=>{ if(isStage(n)&&n.parentNodeId&&nodeById(n.parentNodeId)) recomputeLocal(n); });
+  document.getElementById("pad").style.display="block";
+  const ph=document.getElementById("hint"); ph.textContent="矢印 / WASD で移動"; ph.classList.remove("hidden");
+  document.getElementById("menuBtn").style.display="none"; // Play中はMENU非表示
+  const b=document.getElementById("playBtn"); b.textContent="■"; b.style.background="#a12b2b";
+}
+function stopPlay(){
+  mode=editModeMemory; axisX=axisY=0; keys={};
+  document.getElementById("pad").style.display="none";
+  document.getElementById("menuBtn").style.display="flex";
+  const h=document.getElementById("hint");
+  if(mode==="layout"){ h.textContent="オブジェクトをドラッグして配置"; h.classList.remove("hidden"); }
+  else h.classList.add("hidden");
+  const b=document.getElementById("playBtn"); b.textContent="▶"; updatePlayBtnColor();
+}
+// ▶ボタンの背景：Editor=緑 / Layout=水色（テーマカラー）
+function updatePlayBtnColor(){
+  const b=document.getElementById("playBtn");
+  b.style.background = (mode==="layout") ? "#21b3d6" : "#1f7a3a";
+}
+function setMode(m){ // edit ⇄ layout 切り替え
+  if(mode==="play") return;
+  mode=m; editModeMemory=m;
+  selected=null; propNode=null; hideCreateMenu(); refreshProp();
+  document.getElementById("hint").textContent = (m==="layout") ? "オブジェクトをドラッグして配置" : "矢印 / WASD で移動";
+  document.getElementById("hint").classList.toggle("hidden", m!=="layout");
+  updatePlayBtnColor();
+}
+
+let lastT=0;
+const GRAV=2200, JUMP=880; // 重力(px/s^2) と ジャンプ初速(px/s)
+function objHalf(n){ return { hw:(n.w||80)/2, hh:(n.h||80)/2 }; }
+function overlapAABB(a,b){ const A=objHalf(a),B=objHalf(b);
+  return Math.abs(a.playX-b.playX) < A.hw+B.hw && Math.abs(a.playY-b.playY) < A.hh+B.hh; }
+// 状態を持つノード（応用計算系）の毎フレーム更新
+function updateStatefulNodes(){
+  for(const n of nodes){
+    switch(n.type){
+      case "random": n.rnd = Math.random()*2-1; break;
+      case "button": {
+        const phys = (n.pressed?1:0) || (n.useKey && heldKeys.has(" ") ? 1:0);
+        if(n.output==="toggle"){ if(!n._prev && phys) n.toggleState=!n.toggleState; }
+        else if(n.output==="pulse"){ n.pulseOut = (!n._prev && phys)?1:0; }
+        n._prev=phys; break; }
+      case "counter": { if(inputValue(n,1)!==0) n.cnt=0; else n.cnt=(n.cnt||0)+inputValue(n,0); break; }
+      case "var": { if(inputValue(n,1)!==0) n.store=inputValue(n,0); break; }
+      case "trigger": {
+        const sig=inputValue(n,0); const F=Math.max(0,Math.round(inputValue(n,1)));
+        if((n._prevSig||0)===0 && sig!==0) n._delay=F; // 立ち上がりで予約
+        n._prevSig=sig; n.pulse=0;
+        if(n._delay!=null && n._delay>=0){ if(n._delay===0){ n.pulse=1; n._delay=-1; } else n._delay--; }
+        break; }
+      case "array": {
+        if(!n.arr) n.arr=[];
+        if(inputValue(n,2)!==0){ const i=Math.floor(inputValue(n,0)); if(i>=0&&i<100000) n.arr[i]=inputValue(n,1); }
+        break; }
+    }
+  }
+}
+function playStep(dt){
+  // KEY軸を確定（キーボード＋オンスクリーン）
+  axisX = (keys.R||pad.R?1:0) - (keys.L||pad.L?1:0);
+  axisY = (keys.D||pad.D?1:0) - (keys.U||pad.U?1:0);
+  updateStatefulNodes();
+  const settingNode = nodes.find(n=>n.type==="setting");
+  const G = settingNode ? (settingNode.gravity||GRAV) : GRAV;   // SETTINGで重力変更
+  const floorY = H/2 - 40;                 // 画面下の床（中心基準オフセット座標）
+  const wallL = -W/2 + 10, wallR = W/2 - 10;
+  const objs = nodes.filter(n=>NODE_TYPES[n.type].object);
+
+  // ROTATE：角速度で自身のplayAngleを回す（子が追従する）
+  for(const n of nodes){ if(n.type==="rotate") n.playAngle=(n.playAngle||0)+inputValue(n,0)*dt; }
+  // SOUND：play入力の立ち上がりでビープ
+  for(const n of nodes){ if(n.type==="sound"){ const s=inputValue(n,0);
+    if(!n._prevPlay && s) beep(n.pitch||440); n._prevPlay=s; } }
+
+  // 1) 重力なし（＝足場/静的コライダ）を先に更新
+  const statics = objs.filter(n=>!n.dyn);
+  for(const n of statics){
+    n.playX += inputValue(n,0)*dt;   // 速度入力があれば動く足場になる（無ければ静止）
+    n.playY += inputValue(n,1)*dt;
+  }
+
+  // 2) 重力あり（プレイヤー等）を更新し、静的コライダと衝突解決
+  for(const n of objs){
+    if(!n.dyn) continue;
+    const { hw, hh } = objHalf(n);
+    n.vx = inputValue(n,0);
+    const vyIn = inputValue(n,1);
+    if(vyIn < -1 && n.grounded){ n.vy = -JUMP; n.grounded=false; } // 上入力でジャンプ
+
+    // 横移動 → 足場で左右をブロック
+    n.playX += n.vx*dt;
+    for(const s of statics){ if(overlapAABB(n,s)){ const S=objHalf(s);
+      if(n.vx>0) n.playX = s.playX-(S.hw+hw);
+      else if(n.vx<0) n.playX = s.playX+(S.hw+hw); } }
+
+    // 縦移動（重力）→ 足場に着地／頭ぶつけ
+    n.vy = (n.vy||0) + G*dt;
+    n.playY += n.vy*dt;
+    n.grounded=false;
+    for(const s of statics){ if(overlapAABB(n,s)){ const S=objHalf(s);
+      if(n.vy>0){ n.playY = s.playY-(S.hh+hh); n.vy=0; n.grounded=true; }
+      else if(n.vy<0){ n.playY = s.playY+(S.hh+hh); n.vy=0; } } }
+
+    // 床に着地
+    if(n.playY + hh >= floorY){ n.playY = floorY - hh; n.vy = 0; n.grounded = true; }
+    // 画面端で止める
+    if(n.playX < wallL+hw) n.playX = wallL+hw;
+    if(n.playX > wallR-hw) n.playX = wallR-hw;
+  }
+
+  // 3) 親子構造：子は親の移動に追従（親→子の順で解決）
+  applyHierarchy();
+
+  // 4) SHOT：fire入力の立ち上がりで弾を発射（角度方向へ）
+  for(const n of nodes){ if(n.type!=="shot") continue;
+    const fire=inputValue(n,0); const spd=conns.some(c=>c.b===n.id&&c.bi===1)?inputValue(n,1):400;
+    if(!n._prevFire && fire){ const a=((n.playAngle!=null?n.playAngle:n.angle)-90)*Math.PI/180;
+      bullets.push({ x:n.playX, y:n.playY, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:3 }); }
+    n._prevFire=fire;
+  }
+  for(let i=bullets.length-1;i>=0;i--){ const b=bullets[i];
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
+    if(b.life<=0 || Math.abs(b.x)>W || Math.abs(b.y)>H) bullets.splice(i,1); }
+
+  // 5) VELOCITY計測（各オブジェクトの毎フレーム速度・簡易平滑化）
+  for(const n of objs){ const nx=(n.playX-(n._lastX||n.playX))/Math.max(dt,1e-4), ny=(n.playY-(n._lastY||n.playY))/Math.max(dt,1e-4);
+    n._vx=(n._vx||0)*0.6+nx*0.4; n._vy=(n._vy||0)*0.6+ny*0.4; n._lastX=n.playX; n._lastY=n.playY; }
+
+  // 6) SCREEN：対象を画面中央に追従するカメラ
+  const scr = nodes.find(n=>n.type==="screen" && nodeById(n.target));
+  if(scr){ const t=nodeById(scr.target); playCam.x=-(t.playX||0); playCam.y=-(t.playY||0); }
+  else { playCam.x=0; playCam.y=0; }
+}
+// 簡易ビープ（WebAudio）
+let _audioCtx=null;
+function beep(freq){
+  try{ if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=_audioCtx.createOscillator(), g=_audioCtx.createGain();
+    o.frequency.value=freq; o.type="square"; g.gain.value=0.05;
+    o.connect(g); g.connect(_audioCtx.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, _audioCtx.currentTime+0.15); o.stop(_audioCtx.currentTime+0.16);
+  }catch(e){}
+}
+function stageDepth(n){ let d=0,cur=n,g=0; while(cur.parentNodeId){ const p=nodeById(cur.parentNodeId); if(!p||g++>50)break; d++; cur=p; } return d; }
+// 子の「親ローカル座標（位置lx,ly・角度la）」を現在のレイアウトから計算・保持
+function recomputeLocal(c){ const p=nodeById(c.parentNodeId); if(!p) return;
+  const a=-(p.angle||0)*Math.PI/180, dx=(c.layoutX||0)-(p.layoutX||0), dy=(c.layoutY||0)-(p.layoutY||0);
+  c.lx=dx*Math.cos(a)-dy*Math.sin(a); c.ly=dx*Math.sin(a)+dy*Math.cos(a); c.la=(c.angle||0)-(p.angle||0);
+}
+// 親ローカル→レイアウト絶対（親の回転・移動を反映）
+function worldFromParent(c){ const p=nodeById(c.parentNodeId); if(!p) return;
+  const a=(p.angle||0)*Math.PI/180, lx=c.lx||0, ly=c.ly||0;
+  c.layoutX=(p.layoutX||0)+lx*Math.cos(a)-ly*Math.sin(a);
+  c.layoutY=(p.layoutY||0)+lx*Math.sin(a)+ly*Math.cos(a);
+  c.angle=(p.angle||0)+(c.la||0);
+}
+function directChildren(p){ return nodes.filter(c=>isStage(c)&&c.parentNodeId===p.id); }
+function updateSubtreeWorld(p){ for(const c of directChildren(p)){ worldFromParent(c); updateSubtreeWorld(c); } }
+// Play中：親のplay変換（移動＋回転）で子のplay位置を決める
+function applyHierarchy(){
+  const kids = nodes.filter(n=>isStage(n) && n.parentNodeId && nodeById(n.parentNodeId));
+  kids.sort((a,b)=>stageDepth(a)-stageDepth(b));
+  for(const n of kids){ const p=nodeById(n.parentNodeId);
+    const pa=(p.playAngle!=null?p.playAngle:(p.angle||0));  // 親の現在角度で回転追従
+    const a=pa*Math.PI/180, lx=n.lx||0, ly=n.ly||0;
+    n.playX = p.playX + lx*Math.cos(a)-ly*Math.sin(a);
+    n.playY = p.playY + lx*Math.sin(a)+ly*Math.cos(a);
+    n.playAngle = pa + (n.la||0);
+  }
+}
+
+// =====================================================================
+//  描画
+// =====================================================================
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  if(mode==="edit"){ drawGrid(); drawWires(); drawParentWires(); nodes.forEach(drawNode); drawDragWire(); }
+  else if(mode==="layout") drawLayout();
+  else if(mode==="texedit") drawTexEditor();
+  else drawPlay();
+}
+
+// ---- 親子接続（ノード上端＝子側 / 下端＝親側）----
+const PARENT_COL="#7fe0a0";
+function canHaveParent(n){ return isStage(n) || attachesToObject(n); }
+function parentPortPos(n){ return w2s(n.x, n.y - NS/2); } // 上：自分の親へつなぐ端子
+function childPortPos(n){  return w2s(n.x, n.y + NS/2); } // 下：子を受け入れる端子
+function isCandidateParent(child,p){
+  if(!child||!p||p.id===child.id) return false;
+  if(attachesToObject(child)) return !!NODE_TYPES[p.type].object; // TEXTURE/CONTACT/ONBREAKはオブジェクトへ
+  if(isStage(child)){ if(!isStage(p)) return false;
+    let cur=p,g=0; while(cur){ if(cur.id===child.id) return false; cur=nodeById(cur.parentNodeId); if(g++>60)break; } return true; }
+  return false;
+}
+function drawWireV(p1,p2,color){ const dy=Math.abs(p2.y-p1.y)*0.5+20;
+  ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,3*view.s);
+  ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.bezierCurveTo(p1.x,p1.y+dy, p2.x,p2.y-dy, p2.x,p2.y); ctx.stroke(); }
+function drawParentWires(){
+  for(const n of nodes){ if(!n.parentNodeId) continue; const p=nodeById(n.parentNodeId); if(!p) continue;
+    drawWireV(childPortPos(p), parentPortPos(n), PARENT_COL); }
+}
+
+function drawGrid(){
+  ctx.fillStyle="#12141a"; ctx.fillRect(0,0,W,H);
+  const step=40*view.s; if(step<8) return;
+  const ox=((W/2 - view.x*view.s)%step+step)%step;
+  const oy=((H/2 - view.y*view.s)%step+step)%step;
+  ctx.strokeStyle="#1c2029"; ctx.lineWidth=1; ctx.beginPath();
+  for(let x=ox;x<W;x+=step){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+  for(let y=oy;y<H;y+=step){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+  ctx.stroke();
+}
+
+function drawWire(p1,p2,color){
+  const dx=Math.abs(p2.x-p1.x)*0.5+20;
+  ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,3*view.s);
+  ctx.beginPath(); ctx.moveTo(p1.x,p1.y);
+  ctx.bezierCurveTo(p1.x+dx,p1.y, p2.x-dx,p2.y, p2.x,p2.y); ctx.stroke();
+}
+function drawWires(){
+  for(const c of conns){
+    const a=nodeById(c.a), b=nodeById(c.b); if(!a||!b) continue;
+    drawWire(portPos(a,false,c.ao), portPos(b,true,c.bi), "#7c8598");
+  }
+}
+function drawDragWire(){
+  if(!drag) return;
+  if(drag.kind==="wire"){
+    const a=nodeById(drag.node);
+    drawWire(portPos(a,false,drag.port), {x:drag.sx,y:drag.sy}, "#ffcc00");
+  } else if(drag.kind==="parentwire"){
+    const c=nodeById(drag.node);
+    // カーソル（未来の親の下端）から下向きに出て、子の上端へ上から入る（確定ワイヤーと同じ向き）
+    drawWireV({x:drag.sx,y:drag.sy}, parentPortPos(c), PARENT_COL);
+  }
+}
+
+function drawNode(n){
+  const d=NODE_TYPES[n.type];
+  const tl=w2s(n.x-NS/2, n.y-NS/2);
+  const w=NS*view.s, hh=NS*view.s;
+  // 本体（正方形。オブジェクトはそのオブジェクト色、他はカテゴリ色で全面塗り）
+  roundRect(tl.x,tl.y,w,hh,16*view.s);
+  ctx.fillStyle = d.object ? n.color : d.color; ctx.fill();
+  ctx.strokeStyle = (selected===n.id)?"#ffffff":"rgba(0,0,0,.4)";
+  ctx.lineWidth=(selected===n.id)?3:1.5; ctx.stroke();
+  // 中央のシンボル（1〜3文字）をノードいっぱいに
+  const g=nodeGlyph(n);
+  const cx=tl.x+w/2, cy=tl.y+hh/2;
+  ctx.font=`800 ${Math.round(glyphFontSize(g)*view.s)}px sans-serif`;
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="rgba(0,0,0,.4)"; ctx.fillText(g, cx+1.5, cy+1.5);
+  ctx.fillStyle="#ffffff";        ctx.fillText(g, cx, cy);
+  // 端子（丸のみ）
+  d.inputs.forEach((_,i)=> port(portPos(n,true,i),  "#ffffff"));
+  d.outputs.forEach((_,i)=>port(portPos(n,false,i), "#ffe08a"));
+  // 親子端子：上＝自分の親へつなぐ（子を持てるノード全て）／下＝子を受け入れる
+  if(canHaveParent(n)) port(parentPortPos(n), PARENT_COL);
+  const parentDrag = drag && drag.kind==="parentwire";
+  const isCand = parentDrag && isCandidateParent(nodeById(drag.node), n);
+  if(nodes.some(m=>m.parentNodeId===n.id) || isCand) port(childPortPos(n), isCand ? "#ffffff" : PARENT_COL);
+  // 選択中は端子ラベルをノードの外側に表示
+  if(selected===n.id){
+    ctx.font=`${Math.round(48*view.s)}px sans-serif`; // 端子ラベル3倍（太字にしない）
+    ctx.textBaseline="middle";
+    const gap=(PORT_R+12)*view.s;
+    d.inputs.forEach((lab,i)=>{ const p=portPos(n,true,i); ctx.textAlign="right"; portLabel(lab, p.x-gap, p.y); });
+    d.outputs.forEach((lab,i)=>{ const p=portPos(n,false,i); ctx.textAlign="left"; portLabel(lab, p.x+gap, p.y); });
+  }
+}
+function portLabel(txt,x,y){
+  ctx.fillStyle="rgba(0,0,0,.75)"; ctx.fillText(txt, x+1, y+1);
+  ctx.fillStyle="#ffffff";         ctx.fillText(txt, x, y);
+}
+function port(p,ring){ ctx.beginPath(); ctx.arc(p.x,p.y,PORT_R*view.s,0,7);
+  ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fill(); ctx.lineWidth=2.5*view.s; ctx.strokeStyle=ring; ctx.stroke(); }
+function roundRect(x,y,w,h,r){ ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function roundRectTop(x,y,w,h,r){ ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.lineTo(x+w,y+h);
+  ctx.lineTo(x,y+h); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+// オブジェクトに付いた表示中テクスチャを取得（Visible入力が0なら非表示）
+function objVisibleTexture(obj){
+  const texes = nodes.filter(m=>m.type==="texture" && m.parentNodeId===obj.id);
+  for(const t of texes){
+    const vis = conns.some(c=>c.b===t.id && c.bi===0) ? (inputValue(t,0)!==0) : true;
+    if(vis) return t;
+  }
+  return null;
+}
+function drawTexInto(t,w,h,circle){
+  const N=t.texW||16, cw=w/N, ch=h/N;
+  if(circle){ ctx.save(); ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,7); ctx.clip(); }
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const col=t.pixels[y*N+x]; if(!col) continue;
+    ctx.fillStyle=col; ctx.fillRect(-w/2+x*cw, -h/2+y*ch, cw+0.6, ch+0.6); }
+  if(circle) ctx.restore();
+}
+// オブジェクトを回転付きで描画（テクスチャがあればそれ、無ければ単色）
+function drawObjShape(cx,cy,n,ang){
+  const d=NODE_TYPES[n.type], w=n.w||80, h=n.h||80;
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate((ang!=null?ang:(n.angle||0))*Math.PI/180);
+  const tex=objVisibleTexture(n);
+  if(tex){ drawTexInto(tex, w, h, d.object==="circle"); }
+  else {
+    ctx.fillStyle=n.color;
+    if(d.object==="circle"){ ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,7); ctx.fill(); }
+    else ctx.fillRect(-w/2,-h/2,w,h);
+  }
+  ctx.restore();
+}
+// オブジェクト中心（画面座標）
+function objCenter(n){ return { x:W/2+(n.layoutX||0), y:H/2+(n.layoutY||0) }; }
+// ローカル→画面 / 画面→ローカル（回転考慮）
+function objFromLocal(n,lx,ly){ const c=objCenter(n), a=(n.angle||0)*Math.PI/180;
+  return { x:c.x + lx*Math.cos(a)-ly*Math.sin(a), y:c.y + lx*Math.sin(a)+ly*Math.cos(a) }; }
+function objToLocal(n,sx,sy){ const c=objCenter(n), a=-(n.angle||0)*Math.PI/180, dx=sx-c.x, dy=sy-c.y;
+  return { x:dx*Math.cos(a)-dy*Math.sin(a), y:dx*Math.sin(a)+dy*Math.cos(a) }; }
+
+// ステージ要素（オブジェクト/テキスト/スティック/ボタン/SHOT/ROTATE）を描画
+function drawStage(cx,cy,n,ang){
+  const d=NODE_TYPES[n.type];
+  if(d.object){ drawObjShape(cx,cy,n,ang); return; }
+  const w=n.w||140, h=n.h||140;
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate((ang!=null?ang:(n.angle||0))*Math.PI/180);
+  if(d.stage==="text"){
+    let txt = n.text||"";
+    if(conns.some(c=>c.b===n.id && c.bi===0)) txt = String(Math.round(inputValue(n,0)*100)/100); // val接続時は数値表示
+    ctx.font=`800 ${(n.fontSize||40)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillText(txt, 2, 2);
+    ctx.fillStyle="#ffffff";        ctx.fillText(txt, 0, 0);
+  } else if(d.stage==="stick"){
+    const R=Math.min(w,h)/2;
+    ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.fillStyle="rgba(224,137,43,.18)"; ctx.fill();
+    ctx.strokeStyle="rgba(224,137,43,.75)"; ctx.lineWidth=3; ctx.stroke();
+    const kx=(n.stickX||0)*R*0.55, ky=(n.stickY||0)*R*0.55;
+    ctx.beginPath(); ctx.arc(kx,ky,R*0.4,0,7); ctx.fillStyle="rgba(224,137,43,.85)"; ctx.fill();
+  } else if(d.stage==="button"){
+    roundRect(-w/2,-h/2,w,h,14);
+    ctx.fillStyle = n.pressed ? "rgba(224,137,43,.9)" : "rgba(224,137,43,.32)"; ctx.fill();
+    ctx.strokeStyle="rgba(224,137,43,.9)"; ctx.lineWidth=3; ctx.stroke();
+  } else if(d.stage==="shot"){ // 発射口（三角）
+    ctx.fillStyle=n.color; ctx.beginPath(); ctx.moveTo(0,-h/2); ctx.lineTo(w/2,h/2); ctx.lineTo(-w/2,h/2); ctx.closePath(); ctx.fill();
+  } else if(d.stage==="rotate"){ // 回転ピボット（Play中は非表示）
+    if(mode!=="play"){ const R=Math.min(w,h)/2; ctx.strokeStyle=n.color; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-R,0); ctx.lineTo(R,0); ctx.moveTo(0,-R); ctx.lineTo(0,R); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+function drawLayout(){
+  // ステージ（Play画面と同じ座標系）にオブジェクトを配置・ドラッグする画面
+  ctx.fillStyle="#0d1017"; ctx.fillRect(0,0,W,H);
+  // 中央十字ガイド
+  ctx.strokeStyle="#1e2531"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+  // 重力ONオブジェクトがある場合は床の位置を表示
+  if(nodes.some(n=>NODE_TYPES[n.type].object && n.dyn)){
+    const fy=H-40; ctx.fillStyle="#20252f"; ctx.fillRect(0,fy,W,H-fy);
+    ctx.strokeStyle="#3a4150"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,fy); ctx.lineTo(W,fy); ctx.stroke();
+  }
+  for(const n of nodes){
+    if(!isStage(n)) continue;
+    const c=objCenter(n);
+    drawStage(c.x,c.y,n);
+    if(selected===n.id) drawHandles(n);
+  }
+  if(!nodes.some(isStage)){
+    ctx.fillStyle="#5a6270"; ctx.font="20px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("Editor で TEXT / RECT / STICK などを作るとここに配置できます", W/2, H/2-40);
+  }
+}
+// 選択オブジェクトのハンドル（四隅=リサイズ、上=回転）
+const HANDLE_R=15;
+function handlePositions(n){
+  const hw=(n.w||80)/2, hh=(n.h||80)/2;
+  return {
+    corners:[ objFromLocal(n,-hw,-hh), objFromLocal(n,hw,-hh), objFromLocal(n,-hw,hh), objFromLocal(n,hw,hh) ],
+    rot: objFromLocal(n, 0, -hh-40)
+  };
+}
+function drawHandles(n){
+  const hp=handlePositions(n);
+  // 枠
+  const hw=(n.w||80)/2, hh=(n.h||80)/2;
+  ctx.save(); ctx.translate(objCenter(n).x,objCenter(n).y); ctx.rotate((n.angle||0)*Math.PI/180);
+  ctx.strokeStyle="#7fdcff"; ctx.lineWidth=2; ctx.strokeRect(-hw,-hh,hw*2,hh*2);
+  ctx.beginPath(); ctx.moveTo(0,-hh); ctx.lineTo(0,-hh-40); ctx.stroke(); // 回転レバー
+  ctx.restore();
+  // 四隅ハンドル
+  ctx.fillStyle="#ffffff"; ctx.strokeStyle="#21b3d6"; ctx.lineWidth=2;
+  for(const c of hp.corners){ ctx.beginPath(); ctx.rect(c.x-HANDLE_R,c.y-HANDLE_R,HANDLE_R*2,HANDLE_R*2); ctx.fill(); ctx.stroke(); }
+  // 回転ハンドル
+  ctx.beginPath(); ctx.arc(hp.rot.x,hp.rot.y,HANDLE_R,0,7); ctx.fillStyle="#7fdcff"; ctx.fill(); ctx.stroke();
+}
+
+function drawPlay(){
+  // 背景（BGノードがあればその色）
+  const bgNode = nodes.find(n=>n.type==="bg");
+  ctx.fillStyle = bgNode ? (bgNode.color||"#0a0b10") : "#0a0b10"; ctx.fillRect(0,0,W,H);
+  const camX=playCam.x, camY=playCam.y;
+  // 重力ONオブジェクトがある場合のみ床を描画（カメラ追従）
+  const hasGravity = nodes.some(n=>NODE_TYPES[n.type].object && n.dyn);
+  if(hasGravity){
+    const floorScreenY = H/2 + camY + (H/2 - 40);
+    ctx.fillStyle="#20252f"; ctx.fillRect(0, floorScreenY, W, H-floorScreenY);
+    ctx.strokeStyle="#3a4150"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,floorScreenY); ctx.lineTo(W,floorScreenY); ctx.stroke();
+  }
+  // ステージ要素（STICK/BUTTON等の操作系はカメラ非追従＝画面固定）
+  const uiTypes = new Set(["stick","button"]);
+  for(const n of nodes){
+    if(!isStage(n)) continue;
+    if((n.type==="stick"||n.type==="button") && n.visible===false) continue;
+    const fixed = uiTypes.has(n.type); // 操作UIは画面固定
+    const ox = fixed ? 0 : camX, oy = fixed ? 0 : camY;
+    drawStage(W/2+n.playX+ox, H/2+n.playY+oy, n, (n.playAngle!=null?n.playAngle:n.angle));
+  }
+  // 弾（カメラ追従）
+  ctx.fillStyle="#ffe08a";
+  for(const b of bullets){ ctx.beginPath(); ctx.arc(W/2+b.x+camX, H/2+b.y+camY, 7, 0, 7); ctx.fill(); }
+}
+
+// =====================================================================
+//  入力（ポインタ）
+// =====================================================================
+let drag=null;       // {kind:'node'|'pan'|'wire', ...}
+let selected=null;
+let pointerMoved=false;
+
+function hitPort(sx,sy){
+  const R = PORT_R*view.s + 18; // 指でも押しやすい判定
+  for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i]; const d=NODE_TYPES[n.type];
+    for(let j=0;j<d.outputs.length;j++){ const p=portPos(n,false,j);
+      if(Math.hypot(sx-p.x,sy-p.y)<R) return {node:n.id,isInput:false,port:j}; }
+    for(let j=0;j<d.inputs.length;j++){ const p=portPos(n,true,j);
+      if(Math.hypot(sx-p.x,sy-p.y)<R) return {node:n.id,isInput:true,port:j}; }
+  }
+  return null;
+}
+function hitNode(sx,sy){
+  for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i];
+    const tl=w2s(n.x-NS/2,n.y-NS/2), w=NS*view.s, hh=NS*view.s;
+    if(sx>=tl.x&&sx<=tl.x+w&&sy>=tl.y&&sy<=tl.y+hh){
+      return {node:n.id};
+    }
+  }
+  return null;
+}
+// 上端の親端子（子側）をヒット
+function hitParentPort(sx,sy){
+  const R=PORT_R*view.s+18;
+  for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i]; if(!canHaveParent(n)) continue;
+    const tp=parentPortPos(n); if(Math.hypot(sx-tp.x,sy-tp.y)<R) return n; }
+  return null;
+}
+
+let lpTimer=null, lpX=0, lpY=0;
+function cancelLongPress(){ if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; } }
+
+// レイアウト画面：オブジェクトの当たり判定（回転考慮）
+function hitLayoutObject(sx,sy){
+  for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i];
+    if(!isStage(n)) continue;
+    const l=objToLocal(n,sx,sy);
+    if(Math.abs(l.x)<=(n.w||80)/2 && Math.abs(l.y)<=(n.h||80)/2) return n;
+  }
+  return null;
+}
+// 選択オブジェクトのハンドル判定
+function hitHandle(sx,sy){
+  if(selected==null) return null;
+  const n=nodeById(selected); if(!n || !isStage(n)) return null;
+  const hp=handlePositions(n);
+  if(Math.hypot(sx-hp.rot.x,sy-hp.rot.y)<HANDLE_R+8) return {kind:"rotate"};
+  for(const c of hp.corners){ if(Math.hypot(sx-c.x,sy-c.y)<HANDLE_R+8) return {kind:"resize"}; }
+  return null;
+}
+function onDown(sx,sy){
+  if(mode==="layout"){
+    // 選択中ならまずハンドルを判定
+    const hd=hitHandle(sx,sy);
+    if(hd){ drag={kind:hd.kind, node:selected}; return; }
+    const n=hitLayoutObject(sx,sy);
+    if(n){
+      selected=n.id;
+      drag={kind:"layout", node:n.id, dx:(n.layoutX||0)-(sx-W/2), dy:(n.layoutY||0)-(sy-H/2)};
+      // 長押し → Property
+      lpX=sx; lpY=sy; cancelLongPress();
+      const nid=n.id; lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; openProp(nid); }, 450);
+    } else { selected=null; propNode=null; refreshProp(); }
+    return;
+  }
+  if(mode!=="edit") return;
+  // メニューが開いていれば閉じるだけ
+  if(isCreateMenuOpen()){ hideCreateMenu(); drag=null; return; }
+  pointerMoved=false;
+  // 上端の親端子からドラッグ → 親子接続
+  const pp=hitParentPort(sx,sy);
+  if(pp){ drag={kind:"parentwire", node:pp.id, sx, sy}; return; }
+  const pt=hitPort(sx,sy);
+  if(pt){
+    if(pt.isInput){ disconnectInput(pt.node, pt.port); } // 入力端子タップで切断
+    else { drag={kind:"wire", node:pt.node, port:pt.port, sx, sy}; }
+    return;
+  }
+  const hn=hitNode(sx,sy);
+  if(hn){
+    selected=hn.node;
+    const n=nodeById(hn.node);
+    drag={kind:"node", node:hn.node, dx:n.x-s2w(sx,sy).x, dy:n.y-s2w(sx,sy).y};
+    // ノード長押し → Property パネルを開く
+    lpX=sx; lpY=sy; cancelLongPress();
+    const nid=hn.node;
+    lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; openProp(nid); }, 450);
+    return;
+  }
+  selected=null; propNode=null; refreshProp(); // 背景タップでProperty閉じる
+  drag={kind:"pan", sx, sy, vx:view.x, vy:view.y};
+  // 背景長押し → Create New Node メニュー
+  lpX=sx; lpY=sy; cancelLongPress();
+  lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; showCreateMenu(lpX,lpY); }, 450);
+}
+function onMove(sx,sy){
+  if(lpTimer && Math.hypot(sx-lpX,sy-lpY)>10) cancelLongPress();
+  if(!drag) return;
+  pointerMoved=true;
+  if(drag.kind==="pan"){ view.x=drag.vx-(sx-drag.sx)/view.s; view.y=drag.vy-(sy-drag.sy)/view.s; }
+  else if(drag.kind==="node"){ const wp=s2w(sx,sy); const n=nodeById(drag.node); if(n){ n.x=wp.x+drag.dx; n.y=wp.y+drag.dy; } }
+  else if(drag.kind==="layout"){ const n=nodeById(drag.node); if(n){
+    n.layoutX=(sx-W/2)+drag.dx; n.layoutY=(sy-H/2)+drag.dy;
+    if(n.parentNodeId) recomputeLocal(n);  // 親に対する相対を更新
+    updateSubtreeWorld(n);                 // 子孫を追従
+  } }
+  else if(drag.kind==="resize"){ const n=nodeById(drag.node); if(n){ const l=objToLocal(n,sx,sy);
+    n.w=Math.max(16,Math.round(Math.abs(l.x)*2)); n.h=Math.max(16,Math.round(Math.abs(l.y)*2)); } }
+  else if(drag.kind==="rotate"){ const n=nodeById(drag.node); if(n){ const c=objCenter(n);
+    const raw=Math.atan2(sy-c.y,sx-c.x)*180/Math.PI + 90;
+    n.angle=Math.round(raw/5)*5;           // 5度刻み
+    if(n.parentNodeId) recomputeLocal(n);  // 自分の角度が変わったら相対角度を更新
+    updateSubtreeWorld(n);                 // 子を親座標系で回転・移動
+  } }
+  else if(drag.kind==="wire"){ drag.sx=sx; drag.sy=sy; }
+  else if(drag.kind==="parentwire"){ drag.sx=sx; drag.sy=sy; }
+}
+function onUp(sx,sy){
+  cancelLongPress();
+  if(drag && drag.kind==="wire"){
+    const pt=hitPort(sx,sy);
+    if(pt && pt.isInput) connect(drag.node, drag.port, pt.node, pt.port);
+  }
+  if(drag && drag.kind==="parentwire"){
+    const child=nodeById(drag.node);
+    let target=null;
+    for(let i=nodes.length-1;i>=0;i--){ const p=nodes[i]; if(!isCandidateParent(child,p)) continue;
+      const bp=childPortPos(p); const nearPort=Math.hypot(sx-bp.x,sy-bp.y)<PORT_R*view.s+24;
+      const tl=w2s(p.x-NS/2,p.y-NS/2), w=NS*view.s;
+      const inBody = sx>=tl.x&&sx<=tl.x+w&&sy>=tl.y&&sy<=tl.y+w;
+      if(nearPort||inBody){ target=p; break; } }
+    if(child){ child.parentNodeId = target ? target.id : null; if(target) recomputeLocal(child); } // 空きで離すと解除
+  }
+  drag=null;
+}
+
+// ===== Play中の画面コントロール（STICK/BUTTON/TOUCH）=====
+function playDown(pid,sx,sy){
+  touchDown=1; touchX=sx-W/2; touchY=sy-H/2; // TOUCHノード用
+  // 上のものから判定
+  for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i]; const d=NODE_TYPES[n.type];
+    if(!(d.stage==="stick"||d.stage==="button")) continue;
+    const l=objToLocal(n,sx,sy); const R=Math.min(n.w||150,n.h||150)/2;
+    const hit = (d.stage==="stick") ? (Math.hypot(l.x,l.y)<=R) : (Math.abs(l.x)<=(n.w||150)/2 && Math.abs(l.y)<=(n.h||150)/2);
+    if(hit){
+      if(d.stage==="stick"){ n.stickPid=pid; updateStick(n,l,R); }
+      else { n.btnPid=pid; n.pressed=1; }
+      return;
+    }
+  }
+}
+function updateStick(n,l,R){ let x=l.x/R, y=l.y/R; const m=Math.hypot(x,y); if(m>1){ x/=m; y/=m; } n.stickX=x; n.stickY=y; }
+function playMove(pid,sx,sy){
+  touchX=sx-W/2; touchY=sy-H/2;
+  for(const n of nodes){ const d=NODE_TYPES[n.type];
+    if(d.stage==="stick" && n.stickPid===pid){ const R=Math.min(n.w||150,n.h||150)/2; updateStick(n,objToLocal(n,sx,sy),R); }
+  }
+}
+function playUp(pid){
+  touchDown=0;
+  for(const n of nodes){ const d=NODE_TYPES[n.type];
+    if(d.stage==="stick" && n.stickPid===pid){ n.stickPid=null; n.stickX=0; n.stickY=0; }
+    if(d.stage==="button" && n.btnPid===pid){ n.btnPid=null; n.pressed=0; }
+  }
+}
+
+// ===== テクスチャエディタ =====
+const TEX_PALETTE=["#ffffff","#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#00acc1","#f06292","#8d6e63","#bdbdbd"];
+let texEditNode=null, texColor="#e53935", texEraser=false, texPressed=false, texGeom=null;
+(function buildTexPalette(){
+  const cont=document.getElementById("texPalette"); if(!cont) return;
+  TEX_PALETTE.forEach((col,i)=>{ const sw=document.createElement("div"); sw.className="sw"+(i===2?" sel":"");
+    sw.style.background=col; sw.onclick=()=>{ texColor=col; texEraser=false; markTexSel(sw); }; cont.appendChild(sw); });
+  const er=document.createElement("div"); er.className="sw eraser"; er.onclick=()=>{ texEraser=true; markTexSel(er); }; cont.appendChild(er);
+})();
+function markTexSel(el){ document.querySelectorAll("#texPalette .sw").forEach(s=>s.classList.remove("sel")); el.classList.add("sel"); }
+function openTexEditor(id){ texEditNode=id; mode="texedit"; propNode=null; refreshProp();
+  document.getElementById("texBar").style.display="block";
+  document.getElementById("menuBtn").style.display="none";
+  document.getElementById("playBtn").style.display="none";
+}
+function closeTexEditor(){ texEditNode=null; mode="edit";
+  document.getElementById("texBar").style.display="none";
+  document.getElementById("menuBtn").style.display="flex";
+  document.getElementById("playBtn").style.display="flex";
+}
+function drawTexEditor(){
+  ctx.fillStyle="#0d1017"; ctx.fillRect(0,0,W,H);
+  const n=nodeById(texEditNode); if(!n){ texGeom=null; return; }
+  const N=n.texW||16;
+  const barH=document.getElementById("texBar").offsetHeight||150;
+  const avail=Math.min(W-40, H-barH-40);
+  const cell=Math.floor(avail/N), size=cell*N;
+  const ox=Math.floor((W-size)/2), oy=Math.floor((H-barH-size)/2)+10;
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const px=ox+x*cell, py=oy+y*cell;
+    ctx.fillStyle=((x+y)&1)?"#20242e":"#171a22"; ctx.fillRect(px,py,cell,cell);  // 透明チェッカー
+    const col=n.pixels[y*N+x]; if(col){ ctx.fillStyle=col; ctx.fillRect(px,py,cell,cell); } }
+  ctx.strokeStyle="rgba(255,255,255,.10)"; ctx.lineWidth=1;
+  for(let i=0;i<=N;i++){ ctx.beginPath(); ctx.moveTo(ox+i*cell,oy); ctx.lineTo(ox+i*cell,oy+size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,oy+i*cell); ctx.lineTo(ox+size,oy+i*cell); ctx.stroke(); }
+  texGeom={ox,oy,cell,N};
+}
+function texPaint(sx,sy){ const n=nodeById(texEditNode); if(!n||!texGeom) return;
+  const {ox,oy,cell,N}=texGeom; const x=Math.floor((sx-ox)/cell), y=Math.floor((sy-oy)/cell);
+  if(x<0||y<0||x>=N||y>=N) return; n.pixels[y*N+x]= texEraser?null:texColor;
+}
+document.querySelectorAll("#texTools [data-sz]").forEach(b=> b.onclick=()=>{ const n=nodeById(texEditNode); if(!n)return;
+  const N=+b.dataset.sz; n.texW=N; n.texH=N; n.pixels=new Array(N*N).fill(null); });
+document.getElementById("texClear").onclick=()=>{ const n=nodeById(texEditNode); if(n) n.pixels=new Array((n.texW||16)*(n.texH||16)).fill(null); };
+document.getElementById("texClose").onclick=closeTexEditor;
+
+// pointer events
+cv.addEventListener("pointerdown", e=>{ cv.setPointerCapture(e.pointerId);
+  if(mode==="play"){ playDown(e.pointerId,e.clientX,e.clientY); return; }
+  if(mode==="texedit"){ texPressed=true; texPaint(e.clientX,e.clientY); return; }
+  onDown(e.clientX,e.clientY); });
+cv.addEventListener("pointermove", e=>{
+  if(mode==="play"){ playMove(e.pointerId,e.clientX,e.clientY); return; }
+  if(mode==="texedit"){ if(texPressed) texPaint(e.clientX,e.clientY); return; }
+  onMove(e.clientX,e.clientY); });
+cv.addEventListener("pointerup",   e=>{
+  if(mode==="play"){ playUp(e.pointerId); return; }
+  if(mode==="texedit"){ texPressed=false; return; }
+  onUp(e.clientX,e.clientY); });
+cv.addEventListener("pointercancel", e=>{ if(mode==="play"){ playUp(e.pointerId); return; } texPressed=false; drag=null; cancelLongPress();});
+// wheel zoom
+cv.addEventListener("wheel", e=>{ e.preventDefault(); if(mode!=="edit") return;
+  const before=s2w(e.clientX,e.clientY);
+  view.s *= (e.deltaY<0?1.1:0.9); view.s=Math.min(3,Math.max(0.3,view.s));
+  const after=s2w(e.clientX,e.clientY);
+  view.x+=before.x-after.x; view.y+=before.y-after.y;
+},{passive:false});
+
+// =====================================================================
+//  キーボード / オンスクリーンパッド
+// =====================================================================
+let keys={}, pad={};
+let heldKeys=new Set();  // KEYBOARDノード/ボタン用：押下中のキー(小文字)
+const KMAP={ArrowUp:"U",ArrowDown:"D",ArrowLeft:"L",ArrowRight:"R",w:"U",s:"D",a:"L",d:"R",W:"U",S:"D",A:"L",D:"R"};
+window.addEventListener("keydown", e=>{ const k=KMAP[e.key]; if(k){ keys[k]=true; e.preventDefault(); }
+  heldKeys.add(e.key.toLowerCase());
+  if((e.key==="Delete"||e.key==="Backspace") && selected && mode==="edit"){ removeNode(selected); selected=null; } });
+window.addEventListener("keyup", e=>{ const k=KMAP[e.key]; if(k) keys[k]=false; heldKeys.delete(e.key.toLowerCase()); });
+// TOUCHノード用グローバル状態（Play中のポインタ）
+let touchX=0, touchY=0, touchDown=0;
+document.querySelectorAll("#pad .k").forEach(el=>{
+  const d=el.dataset.d;
+  const on=e=>{e.preventDefault(); pad[d]=true;}, off=e=>{e.preventDefault(); pad[d]=false;};
+  el.addEventListener("pointerdown",on); el.addEventListener("pointerup",off);
+  el.addEventListener("pointerleave",off); el.addEventListener("pointercancel",off);
+});
+
+// =====================================================================
+//  背景長押しの Create New Node メニュー
+// =====================================================================
+const createMenu=document.getElementById("createMenu");
+(function buildCreateMenu(){
+  const title=document.createElement("div"); title.className="title"; title.textContent="CREATE NEW NODE";
+  const row=document.createElement("div"); row.className="row";
+  PALETTE.forEach(t=>{ const d=NODE_TYPES[t];
+    const b=document.createElement("div"); b.className="ci";
+    b.innerHTML=`<span class="swatch" style="background:${d.color}"></span>${d.label}`;
+    b.onclick=(e)=>{ e.stopPropagation();
+      if(createMenu._w) addNode(t, createMenu._w.x, createMenu._w.y);
+      hideCreateMenu(); };
+    row.appendChild(b);
+  });
+  createMenu.appendChild(title); createMenu.appendChild(row);
+})();
+function showCreateMenu(sx,sy){
+  createMenu._w=s2w(sx,sy);
+  createMenu.style.display="block";
+  const mw=createMenu.offsetWidth||220, mh=createMenu.offsetHeight||180;
+  createMenu.style.left=Math.max(6,Math.min(W-mw-6, sx-mw/2))+"px";
+  createMenu.style.top =Math.max(10,Math.min(H-mh-6, sy-10))+"px";
+}
+function hideCreateMenu(){ createMenu.style.display="none"; createMenu._w=null; }
+function isCreateMenuOpen(){ return createMenu.style.display==="block"; }
+
+// プロパティパネル（ノード長押しで表示・編集・削除）
+let propNode=null; // Property を表示中のノードID（長押しで設定）
+const propPanel=document.getElementById("propPanel");
+function openProp(id){ propNode=id; refreshProp(); }
+function refreshProp(){
+  const n = (propNode!=null) ? nodeById(propNode) : null;
+  if(!n || (mode!=="edit" && mode!=="layout")){ propPanel.style.display="none"; return; }
+  const d=NODE_TYPES[n.type];
+  propPanel.innerHTML="";
+  const t=document.createElement("div"); t.className="pt";
+  t.innerHTML=`<span class="swatch" style="background:${(d.object)?n.color:d.color}"></span>${d.label}`;
+  const numRow=(label,get,set,step)=>{ const r=document.createElement("div"); r.className="prow";
+    const lb=document.createElement("label"); lb.textContent=label;
+    const inp=document.createElement("input"); inp.type="number"; if(step)inp.step=step; inp.value=Math.round(get());
+    inp.oninput=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)) set(v); };
+    r.appendChild(lb); r.appendChild(inp); propPanel.appendChild(r); };
+  const chkRow=(label,get,set)=>{ const r=document.createElement("div"); r.className="prow";
+    const lb=document.createElement("label"); lb.textContent=label;
+    const c=document.createElement("input"); c.type="checkbox"; c.checked=!!get();
+    c.onchange=()=>set(c.checked); r.appendChild(lb); r.appendChild(c); propPanel.appendChild(r); };
+  const selRow=(label,opts,get,set)=>{ const r=document.createElement("div"); r.className="prow";
+    const lb=document.createElement("label"); lb.textContent=label;
+    const s=document.createElement("select"); opts.forEach(o=>{ const op=document.createElement("option");
+      op.value=o.value; op.textContent=o.label; if(get()===o.value) op.selected=true; s.appendChild(op); });
+    s.onchange=()=>set(s.value); r.appendChild(lb); r.appendChild(s); propPanel.appendChild(r); };
+  const cl=document.createElement("button"); cl.className="pclose"; cl.textContent="×";
+  cl.onclick=()=>{ propNode=null; refreshProp(); };
+  t.appendChild(cl);
+  propPanel.appendChild(t);
+  if(n.type==="const"){
+    const row=document.createElement("div"); row.className="prow";
+    const lb=document.createElement("label"); lb.textContent="VALUE";
+    const inp=document.createElement("input"); inp.type="number"; inp.value=n.value;
+    inp.oninput=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)) n.value=v; };
+    row.appendChild(lb); row.appendChild(inp); propPanel.appendChild(row);
+  }
+  if(n.type==="text"){
+    // TEXT 文字列とフォントサイズ
+    const r=document.createElement("div"); r.className="prow";
+    const lb=document.createElement("label"); lb.textContent="TEXT";
+    const inp=document.createElement("input"); inp.type="text"; inp.value=n.text||"";
+    inp.oninput=()=>{ n.text=inp.value; };
+    r.appendChild(lb); r.appendChild(inp); propPanel.appendChild(r);
+    numRow("FONT", ()=>n.fontSize||40, v=>{ n.fontSize=Math.max(8,v); });
+  }
+  if(n.type==="stick"){
+    selRow("MODE", [{value:"analog",label:"ANALOG"},{value:"digital",label:"DIGITAL"}], ()=>n.mode||"analog", v=>{ n.mode=v; refreshProp(); });
+    if(n.mode==="digital") numRow("THRESHOLD", ()=>Math.round((n.threshold||0.3)*100), v=>{ n.threshold=Math.min(1,Math.max(0,v/100)); });
+    chkRow("LIMIT AXIS", ()=>n.limitAxis, v=>{ n.limitAxis=v; });
+    chkRow("KEYBOARD",  ()=>n.useKey,   v=>{ n.useKey=v; });
+    chkRow("VISIBLE",   ()=>n.visible!==false, v=>{ n.visible=v; });
+  }
+  if(n.type==="button"){
+    selRow("OUTPUT", [{value:"momentary",label:"MOMENTARY"},{value:"toggle",label:"TOGGLE"},{value:"pulse",label:"PULSE"}], ()=>n.output||"momentary", v=>{ n.output=v; });
+    chkRow("SPACE KEY", ()=>n.useKey, v=>{ n.useKey=v; });
+    chkRow("VISIBLE",   ()=>n.visible!==false, v=>{ n.visible=v; });
+  }
+  if(n.type==="keyboard"){
+    const KEYS=[{value:" ",label:"SPACE"},{value:"enter",label:"ENTER"},
+      {value:"arrowup",label:"↑"},{value:"arrowdown",label:"↓"},{value:"arrowleft",label:"←"},{value:"arrowright",label:"→"},
+      {value:"w",label:"W"},{value:"a",label:"A"},{value:"s",label:"S"},{value:"d",label:"D"},
+      {value:"z",label:"Z"},{value:"x",label:"X"}];
+    selRow("KEY", KEYS, ()=>n.keyCode||" ", v=>{ n.keyCode=v; });
+  }
+  if(n.type==="sound"){ numRow("PITCH", ()=>n.pitch||440, v=>{ n.pitch=Math.max(50,v); }); }
+  if(n.type==="bg"){ selRow("COLOR", [{value:"#0a0b10",label:"BLACK"},{value:"#0d2137",label:"NAVY"},
+    {value:"#13233a",label:"BLUE"},{value:"#182a18",label:"GREEN"},{value:"#2a182a",label:"PURPLE"},{value:"#eef0f4",label:"WHITE"}],
+    ()=>n.color||"#0a0b10", v=>{ n.color=v; }); }
+  if(n.type==="setting"){ numRow("GRAVITY", ()=>n.gravity||2200, v=>{ n.gravity=Math.max(0,v); }); }
+  if(d.object){
+    // DYNAMICS（物理演算）トグル
+    const grow=document.createElement("div"); grow.className="prow";
+    const glb=document.createElement("label"); glb.textContent="DYNAMICS";
+    const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=!!n.dyn;
+    chk.onchange=()=>{ n.dyn=chk.checked; };
+    grow.appendChild(glb); grow.appendChild(chk); propPanel.appendChild(grow);
+  }
+  if(d.object || d.stage){
+    // W / H / ANGLE（ハンドルでも変更可）
+    numRow("WIDTH",  ()=>n.w||80,  v=>{ n.w=Math.max(16,v); });
+    numRow("HEIGHT", ()=>n.h||80,  v=>{ n.h=Math.max(16,v); });
+    numRow("ANGLE",  ()=>n.angle||0, v=>{ n.angle=v; });
+  }
+  if(d.target){ // GETPOS / GETROT の対象オブジェクト
+    const r=document.createElement("div"); r.className="prow";
+    const lb=document.createElement("label"); lb.textContent="TARGET";
+    const sel=document.createElement("select");
+    const none=document.createElement("option"); none.value=""; none.textContent="(none)"; sel.appendChild(none);
+    nodes.filter(m=>NODE_TYPES[m.type].object).forEach(o=>{
+      const op=document.createElement("option"); op.value=String(o.id);
+      op.textContent=NODE_TYPES[o.type].label+" #"+o.id;
+      if(n.target===o.id) op.selected=true; sel.appendChild(op); });
+    sel.onchange=()=>{ n.target = sel.value ? parseInt(sel.value) : null; };
+    r.appendChild(lb); r.appendChild(sel); propPanel.appendChild(r);
+  }
+  // 親子構造は端子ワイヤーで設定するため、Propertyには出さない
+  // テクスチャ編集
+  if(d.tex){
+    const eb=document.createElement("button"); eb.className="del"; eb.style.background="#c79a10"; eb.style.borderColor="#e0c020";
+    eb.textContent="EDIT TEXTURE";
+    eb.onclick=()=> openTexEditor(n.id);
+    propPanel.appendChild(eb);
+  }
+  const del=document.createElement("button"); del.className="del"; del.textContent="DELETE";
+  del.onclick=()=>{ removeNode(n.id); if(selected===n.id) selected=null; propNode=null; refreshProp(); };
+  propPanel.appendChild(del);
+  propPanel.style.display="block";
+}
+
+// ▶ ボタン：タップで再生/停止（Editor/Layout どちらからも再生できる）
+document.getElementById("playBtn").onclick=()=> (mode==="play")?stopPlay():startPlay();
+
+// =====================================================================
+//  MENU ボタンのフリックメニュー（元デザイン準拠）
+//  押したまま項目へドラッグ→離すと実行。タップだけでは何も起きない。
+// =====================================================================
+const menuBtn=document.getElementById("menuBtn");
+const flick=document.getElementById("flick");
+const FLICK_ITEMS=[
+  { key:"save", label:"SAVE", color:"#c0392b", run:doSave },
+  { key:"load", label:"LOAD", color:"#2b6fd0", run:doLoad },
+  { key:"fit",  label:"FIT",  color:"#1f7a3a", run:fitView },
+  { key:"new",  label:"NEW",  color:"#555b68", run:doNew },
+];
+let flickEls=[], flickHot=null;
+function openFlick(){
+  flick.innerHTML=""; flickEls=[]; flickHot=null;
+  const bx=W-14-72, by=98; // MENUボタンの位置
+  // 先頭に Editor⇄Layout 切り替えを動的追加
+  const modeItem = (mode==="layout")
+    ? { label:"EDITOR", color:"#1f7a3a", run:()=>setMode("edit") }   // Editorテーマ=緑
+    : { label:"LAYOUT", color:"#21b3d6", run:()=>setMode("layout") }; // Layoutテーマ=水色
+  const items=[modeItem, ...FLICK_ITEMS];
+  items.forEach((it,i)=>{
+    const el=document.createElement("div"); el.className="fi"; el.textContent=it.label;
+    el.style.background=it.color;
+    el.style.left=(bx-165)+"px";            // MENUの左側に縦に並べる
+    el.style.top =(by + i*68)+"px";
+    el._it=it; flick.appendChild(el); flickEls.push(el);
+  });
+  flick.style.display="block";
+}
+function updateFlick(sx,sy){
+  flickHot=null;
+  for(const el of flickEls){
+    const r=el.getBoundingClientRect();
+    const hit = sx>=r.left&&sx<=r.right&&sy>=r.top&&sy<=r.bottom;
+    el.classList.toggle("hot", hit);
+    if(hit) flickHot=el._it;
+  }
+}
+function closeFlick(run){
+  if(run && flickHot) flickHot.run();
+  flick.style.display="none"; flickEls=[]; flickHot=null;
+}
+menuBtn.addEventListener("pointerdown", e=>{ e.preventDefault(); menuBtn.setPointerCapture(e.pointerId); openFlick(); });
+menuBtn.addEventListener("pointermove", e=>{ if(flick.style.display==="block") updateFlick(e.clientX,e.clientY); });
+menuBtn.addEventListener("pointerup",   e=>{ if(flick.style.display==="block") closeFlick(true); });
+menuBtn.addEventListener("pointercancel",()=>closeFlick(false));
+
+function doNew(){ if(confirm("すべて消去して新規作成しますか？")){ nodes=[]; conns=[]; selected=null; propNode=null; view={x:0,y:0,s:1}; } }
+function doSave(){ try{ localStorage.setItem("nodegram_web", serialize()); alert("保存しました"); }catch(e){ alert("保存できません: "+e.message); } }
+function doLoad(){ try{ const s=localStorage.getItem("nodegram_web"); if(s){ deserialize(s); } else alert("保存データがありません"); }catch(e){ alert("読込エラー: "+e.message); } }
+
+function serialize(){ return JSON.stringify({nodes,conns,nextId}); }
+function deserialize(s){ const o=JSON.parse(s); nodes=o.nodes||[]; conns=o.conns||[]; nextId=o.nextId||1; selected=null; propNode=null;
+  // 旧データ移行（size → w/h/angle）
+  nodes.forEach(n=>{ if(NODE_TYPES[n.type]&&isStage(n)){
+    if(n.w==null) n.w=n.size||80; if(n.h==null) n.h=n.size||80; if(n.angle==null) n.angle=0;
+    if(n.layoutX==null) n.layoutX=0; if(n.layoutY==null) n.layoutY=0;
+    if(n.type==="text"&&n.text==null) n.text="TEXT";
+    if(n.type==="text"&&n.fontSize==null) n.fontSize=40;
+    if(n.type==="stick"){ if(n.mode==null)n.mode="analog"; if(n.threshold==null)n.threshold=0.3;
+      if(n.limitAxis==null)n.limitAxis=false; if(n.useKey==null)n.useKey=false; if(n.visible==null)n.visible=true; }
+    if(n.type==="button"){ if(n.output==null)n.output="momentary"; if(n.useKey==null)n.useKey=false; if(n.visible==null)n.visible=true; }
+  } });
+  nodes.forEach(n=>{ if(NODE_TYPES[n.type]&&n.type==="keyboard"&&n.keyCode==null) n.keyCode=" "; });
+  nodes.forEach(n=>{ if(isStage(n)&&n.parentNodeId) recomputeLocal(n); }); // 親子ローカル復元
+}
+
+function fitView(){
+  if(nodes.length===0){ view={x:0,y:0,s:1}; return; }
+  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+  for(const n of nodes){
+    minx=Math.min(minx,n.x-NS/2); maxx=Math.max(maxx,n.x+NS/2);
+    miny=Math.min(miny,n.y-NS/2); maxy=Math.max(maxy,n.y+NS/2); }
+  const pad=50; const bw=maxx-minx+pad*2, bh=maxy-miny+pad*2;
+  view.s=Math.min(1.4,Math.max(0.3, Math.min(W/bw,(H-20)/bh)));
+  view.x=(minx+maxx)/2; view.y=(miny+maxy)/2;
+}
+// スマホ向け：全体を詰め込まず、読みやすい倍率で中央に寄せる
+function centerReadable(){
+  if(nodes.length===0){ view={x:0,y:0,s:1}; return; }
+  let minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+  for(const n of nodes){ const h=nodeHeight(n.type);
+    minx=Math.min(minx,n.x); maxx=Math.max(maxx,n.x);
+    miny=Math.min(miny,n.y); maxy=Math.max(maxy,n.y); }
+  view.x=(minx+maxx)/2; view.y=(miny+maxy)/2;
+  view.s=0.75; // 文字が読みやすい倍率
+}
+
+// =====================================================================
+//  デフォルトのサンプル（KEYで RECT を動かす）
+// =====================================================================
+function sample(){
+  const stk=addNode("stick",-190,-130); stk.useKey=true; stk.layoutX=-230; stk.layoutY=150; // 画面スティック＋キーボード
+  const spd=addNode("const",-190,90); spd.value=320;
+  const mx=addNode("mul",70,-150);
+  const my=addNode("mul",70,50);
+  const rc=addNode("rect",330,-60); rc.color="#3ad0ff"; rc.dyn=true; // プレイヤー（重力ON）
+  rc.w=70; rc.h=70; rc.layoutX=-120; rc.layoutY=-180;
+  connect(stk.id,0, mx.id,0); connect(spd.id,0, mx.id,1);
+  connect(stk.id,1, my.id,0); connect(spd.id,0, my.id,1);
+  connect(mx.id,0, rc.id,0);  connect(my.id,0, rc.id,1);
+  // 静的な足場（重力OFF＝乗れるブロック）
+  const plat=addNode("rect",330,140); plat.color="#c084fc"; plat.dyn=false;
+  plat.w=280; plat.h=40; plat.layoutX=120; plat.layoutY=40;
+  centerReadable();
+}
+sample();
+
+// =====================================================================
+//  メインループ
+// =====================================================================
+let lastPropNode="__init__", lastMode="";
+function loop(t){
+  const dt=Math.min(0.05,(t-lastT)/1000)||0; lastT=t;
+  if(mode==="play") playStep(dt);
+  if(propNode!==lastPropNode || mode!==lastMode){ lastPropNode=propNode; lastMode=mode; refreshProp(); }
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

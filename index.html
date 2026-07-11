@@ -243,9 +243,12 @@ function addNode(type, wx, wy){
     if(d.object){ n.color=randObjColor(); n.w=80; n.h=80; n.bounce=0; n.friction=0.0; n.flip=false; }
     else if(d.stage==="text"){ n.color="#8a3bd0"; n.w=240; n.h=70; n.text="TEXT"; n.fontSize=40; n.textColor="#ffffff"; n.align="center"; }
     else if(d.stage==="stick"){ n.color="#e0892b"; n.w=200; n.h=200;
-      n.mode="analog"; n.threshold=0.3; n.limitAxis=false; n.useKey=false; n.visible=true; }
+      n.style="frame"; n.mode="analog"; n.threshold=0.3; n.limitAxis=false;
+      n.keyMode="off"; n.cntlMode="off"; n.hideOnPc=false;
+      n.useKey=false; n.visible=true; }
     else if(d.stage==="button"){ n.color="#e0892b"; n.w=150; n.h=150;
-      n.output="momentary"; n.useKey=false; n.visible=true; }
+      n.style="frame"; n.output="momentary"; n.cntlBtn="off"; n.keyCode=""; n.hideOnPc=false;
+      n.useKey=false; n.visible=true; }
     else if(d.stage==="shot"){ n.color="#c084fc"; n.w=70; n.h=70; n.angle=0; n.destroyTag=""; n.bulletSpd=400; n.bulletSize=14; n.bulletColor="#ffe08a"; }
     else if(d.stage==="rotate"){ n.color="#e0c020"; n.w=70; n.h=70; }
     if(type==="character"){ n.color=randObjColor(); n.flip=true; }
@@ -341,7 +344,8 @@ function outputValue(node, port, seen){
     case "key":     return port===0 ? axisX : axisY;
     case "stick": {
       let x=node.stickX||0, y=node.stickY||0;
-      if(node.useKey){ x+=(keys.R?1:0)-(keys.L?1:0); y+=(keys.D?1:0)-(keys.U?1:0);
+      const km=node.keyMode||(node.useKey?"wasd":"off");
+      if(km!=="off"){ const ax=keyModeAxis(km); x+=ax.x; y+=ax.y;
         x=Math.max(-1,Math.min(1,x)); y=Math.max(-1,Math.min(1,y)); }
       if(node.limitAxis){ if(Math.abs(x)>=Math.abs(y)) y=0; else x=0; }
       if(node.mode==="digital"){ const th=node.threshold||0.3;
@@ -349,7 +353,8 @@ function outputValue(node, port, seen){
       return port===0 ? x : y;
     }
     case "button": {
-      const phys = (node.pressed?1:0) || (node.useKey && heldKeys.has(" ") ? 1:0);
+      const bk=node.keyCode||(node.useKey?" ":"");
+      const phys = (node.pressed?1:0) || (bk && heldKeys.has(bk) ? 1:0);
       if(node.output==="toggle") return node.toggleState?1:0;
       if(node.output==="pulse")  return node.pulseOut?1:0;
       return phys?1:0;
@@ -449,7 +454,8 @@ function updateStatefulNodes(){
     switch(n.type){
       case "random": n.rnd = Math.random()*2-1; break;
       case "button": {
-        const phys = (n.pressed?1:0) || (n.useKey && heldKeys.has(" ") ? 1:0);
+        const bk=n.keyCode||(n.useKey?" ":"");
+        const phys = (n.pressed?1:0) || (bk && heldKeys.has(bk) ? 1:0);
         if(n.output==="toggle"){ if(!n._prev && phys) n.toggleState=!n.toggleState; }
         else if(n.output==="pulse"){ n.pulseOut = (!n._prev && phys)?1:0; }
         n._prev=phys; break; }
@@ -768,15 +774,17 @@ function drawStage(cx,cy,n,ang){
     ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillText(txt, ax+2, 2);
     ctx.fillStyle=n.textColor||"#ffffff"; ctx.fillText(txt, ax, 0);
   } else if(d.stage==="stick"){
-    const R=Math.min(w,h)/2;
-    ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.fillStyle="rgba(224,137,43,.18)"; ctx.fill();
-    ctx.strokeStyle="rgba(224,137,43,.75)"; ctx.lineWidth=3; ctx.stroke();
+    const R=Math.min(w,h)/2; const col=n.color||"#e0892b"; const fill=(n.style||"frame")==="fill";
+    ctx.beginPath(); ctx.arc(0,0,R,0,7);
+    ctx.globalAlpha=fill?0.55:0.18; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
     const kx=(n.stickX||0)*R*0.55, ky=(n.stickY||0)*R*0.55;
-    ctx.beginPath(); ctx.arc(kx,ky,R*0.4,0,7); ctx.fillStyle="rgba(224,137,43,.85)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(kx,ky,R*0.4,0,7); ctx.globalAlpha=0.85; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
   } else if(d.stage==="button"){
+    const col=n.color||"#e0892b"; const fill=(n.style||"frame")==="fill";
     roundRect(-w/2,-h/2,w,h,14);
-    ctx.fillStyle = n.pressed ? "rgba(224,137,43,.9)" : "rgba(224,137,43,.32)"; ctx.fill();
-    ctx.strokeStyle="rgba(224,137,43,.9)"; ctx.lineWidth=3; ctx.stroke();
+    ctx.globalAlpha = n.pressed ? 0.9 : (fill?0.6:0.32); ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
   } else if(d.stage==="shot"){ // 発射口（三角）
     ctx.fillStyle=n.color; ctx.beginPath(); ctx.moveTo(0,-h/2); ctx.lineTo(w/2,h/2); ctx.lineTo(-w/2,h/2); ctx.closePath(); ctx.fill();
   } else if(d.stage==="rotate"){ // 回転ピボット（Play中は非表示）
@@ -848,7 +856,7 @@ function drawPlay(){
   // ステージ要素（SORTLAYER順、破壊済みは非表示、操作UIは画面固定）
   const uiTypes = new Set(["stick","button"]);
   const drawList = nodes.filter(n=>isStage(n) && !destroyed.has(n.id)
-    && !((n.type==="stick"||n.type==="button") && n.visible===false));
+    && !((n.type==="stick"||n.type==="button") && uiCtrlHidden(n)));
   drawList.sort((a,b)=>(a.layer||50)-(b.layer||50));
   for(const n of drawList){
     const fixed = uiTypes.has(n.type);
@@ -1075,6 +1083,7 @@ function playDown(pid,sx,sy){
   // 上のものから判定
   for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i]; const d=NODE_TYPES[n.type];
     if(!(d.stage==="stick"||d.stage==="button")) continue;
+    if(uiCtrlHidden(n)) continue;
     const l=objToLocal(n,sx,sy); const R=Math.min(n.w||150,n.h||150)/2;
     const hit = (d.stage==="stick") ? (Math.hypot(l.x,l.y)<=R) : (Math.abs(l.x)<=(n.w||150)/2 && Math.abs(l.y)<=(n.h||150)/2);
     if(hit){
@@ -1084,6 +1093,10 @@ function playDown(pid,sx,sy){
     }
   }
 }
+const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints>0);
+// STICK/BUTTONの表示・当たり判定を隠すか（STYLE=OFF / VISIBLE=false / Hide on PC）
+function uiCtrlHidden(n){ if((n.style||"frame")==="off") return true; if(n.visible===false) return true;
+  if(n.hideOnPc && !IS_TOUCH) return true; return false; }
 function updateStick(n,l,R){ let x=l.x/R, y=l.y/R; const m=Math.hypot(x,y); if(m>1){ x/=m; y/=m; } n.stickX=x; n.stickY=y; }
 function playMove(pid,sx,sy){
   touchX=sx-W/2; touchY=sy-H/2;
@@ -1202,6 +1215,16 @@ cv.addEventListener("wheel", e=>{ e.preventDefault();
 let keys={}, pad={};
 let heldKeys=new Set();  // KEYBOARDノード/ボタン用：押下中のキー(小文字)
 const KMAP={ArrowUp:"U",ArrowDown:"D",ArrowLeft:"L",ArrowRight:"R",w:"U",s:"D",a:"L",d:"R",W:"U",S:"D",A:"L",D:"R"};
+// STICK/BUTTONのKEYBOARDモード別キーセット（Off以外）
+const KEYSETS={
+  wasd:{u:"w",d:"s",l:"a",r:"d"},
+  ijkl:{u:"i",d:"k",l:"j",r:"l"},
+  cursor:{u:"arrowup",d:"arrowdown",l:"arrowleft",r:"arrowright"},
+  "8462":{u:"8",d:"2",l:"4",r:"6"},
+};
+function keyModeAxis(km){ const s=KEYSETS[km]; if(!s) return {x:0,y:0};
+  return { x:(heldKeys.has(s.r)?1:0)-(heldKeys.has(s.l)?1:0),
+           y:(heldKeys.has(s.d)?1:0)-(heldKeys.has(s.u)?1:0) }; }
 window.addEventListener("keydown", e=>{
   // 入力欄の編集中はショートカット・削除を無効化（CONST値編集でノードが消えるのを防ぐ）
   const ae=document.activeElement; if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
@@ -1311,7 +1334,7 @@ function refreshProp(){
   propPanel.appendChild(t);
   if(n.type==="const"){
     const row=document.createElement("div"); row.className="prow";
-    const lb=document.createElement("label"); lb.textContent="VALUE";
+    const lb=document.createElement("label"); lb.textContent="Value";
     const inp=document.createElement("input"); inp.type="number"; inp.value=n.value;
     inp.oninput=()=>{ const v=parseFloat(inp.value); if(!isNaN(v)) n.value=v; };
     row.appendChild(lb); row.appendChild(inp); propPanel.appendChild(row);
@@ -1319,62 +1342,76 @@ function refreshProp(){
   if(n.type==="text"){
     // TEXT 文字列とフォントサイズ
     const r=document.createElement("div"); r.className="prow";
-    const lb=document.createElement("label"); lb.textContent="TEXT";
+    const lb=document.createElement("label"); lb.textContent="Text";
     const inp=document.createElement("input"); inp.type="text"; inp.value=n.text||"";
     inp.oninput=()=>{ n.text=inp.value; };
     r.appendChild(lb); r.appendChild(inp); propPanel.appendChild(r);
-    numRow("FONT", ()=>n.fontSize||40, v=>{ n.fontSize=Math.max(8,v); });
-    selRow("ALIGN", [{value:"left",label:"LEFT"},{value:"center",label:"CENTER"},{value:"right",label:"RIGHT"}], ()=>n.align||"center", v=>{ n.align=v; });
-    colRow("COLOR", OBJ_COLORS, ()=>n.textColor||"#ffffff", v=>{ n.textColor=v; });
+    numRow("Size", ()=>n.fontSize||40, v=>{ n.fontSize=Math.max(8,v); });
+    selRow("Align", [{value:"left",label:"Left"},{value:"center",label:"Center"},{value:"right",label:"Right"}], ()=>n.align||"center", v=>{ n.align=v; });
+    colRow("Color", OBJ_COLORS, ()=>n.textColor||"#ffffff", v=>{ n.textColor=v; });
   }
+  const STYLE_OPTS=[{value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},{value:"off",label:"OFF"}];
+  const KEYMODE_OPTS=[{value:"off",label:"Off"},{value:"wasd",label:"WASD"},{value:"ijkl",label:"IJKL"},{value:"cursor",label:"Cursor"},{value:"8462",label:"8462"}];
+  const CNTL_OPTS=[{value:"off",label:"Off"},{value:"lstick",label:"L-Stick"},{value:"rstick",label:"R-Stick"},{value:"dpad",label:"DPAD"}];
+  const KEY_OPTS=[{value:"",label:"Off"},{value:" ",label:"SPACE"},{value:"enter",label:"ENTER"},
+    {value:"arrowup",label:"↑"},{value:"arrowdown",label:"↓"},{value:"arrowleft",label:"←"},{value:"arrowright",label:"→"},
+    {value:"w",label:"W"},{value:"a",label:"A"},{value:"s",label:"S"},{value:"d",label:"D"},
+    {value:"i",label:"I"},{value:"j",label:"J"},{value:"k",label:"K"},{value:"l",label:"L"},
+    {value:"z",label:"Z"},{value:"x",label:"X"},{value:"c",label:"C"}];
   if(n.type==="stick"){
-    selRow("MODE", [{value:"analog",label:"ANALOG"},{value:"digital",label:"DIGITAL"}], ()=>n.mode||"analog", v=>{ n.mode=v; refreshProp(); });
-    if(n.mode==="digital") numRow("THRESHOLD", ()=>Math.round((n.threshold||0.3)*100), v=>{ n.threshold=Math.min(1,Math.max(0,v/100)); });
-    chkRow("LIMIT AXIS", ()=>n.limitAxis, v=>{ n.limitAxis=v; });
-    chkRow("KEYBOARD",  ()=>n.useKey,   v=>{ n.useKey=v; });
-    chkRow("VISIBLE",   ()=>n.visible!==false, v=>{ n.visible=v; });
+    selRow("Style",  STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
+    colRow("Color",  OBJ_COLORS, ()=>n.color||"#e0892b", v=>{ n.color=v; });
+    selRow("Signal", [{value:"analog",label:"Analog"},{value:"digital",label:"Digital"}], ()=>n.mode||"analog", v=>{ n.mode=v; refreshProp(); });
+    if(n.mode==="digital"){
+      numRow("Threshold %", ()=>Math.round((n.threshold||0.3)*100), v=>{ n.threshold=Math.min(1,Math.max(0,v/100)); });
+      chkRow("Limit Axis",  ()=>n.limitAxis, v=>{ n.limitAxis=v; });
+    }
+    selRow("Keyboard",   KEYMODE_OPTS, ()=>n.keyMode||"off", v=>{ n.keyMode=v; });
+    selRow("Controller", CNTL_OPTS,    ()=>n.cntlMode||"off", v=>{ n.cntlMode=v; });
+    chkRow("Hide on PC", ()=>n.hideOnPc, v=>{ n.hideOnPc=v; });
   }
   if(n.type==="button"){
-    selRow("OUTPUT", [{value:"momentary",label:"MOMENTARY"},{value:"toggle",label:"TOGGLE"},{value:"pulse",label:"PULSE"}], ()=>n.output||"momentary", v=>{ n.output=v; });
-    chkRow("SPACE KEY", ()=>n.useKey, v=>{ n.useKey=v; });
-    chkRow("VISIBLE",   ()=>n.visible!==false, v=>{ n.visible=v; });
+    selRow("Style",  STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
+    colRow("Color",  OBJ_COLORS, ()=>n.color||"#e0892b", v=>{ n.color=v; });
+    selRow("Output", [{value:"momentary",label:"Momentary"},{value:"toggle",label:"Toggle"},{value:"pulse",label:"Pulse"}], ()=>n.output||"momentary", v=>{ n.output=v; });
+    selRow("Keyboard",   KEY_OPTS,  ()=>n.keyCode||"", v=>{ n.keyCode=v; });
+    selRow("Controller", CNTL_OPTS, ()=>n.cntlBtn||"off", v=>{ n.cntlBtn=v; });
+    chkRow("Hide on PC", ()=>n.hideOnPc, v=>{ n.hideOnPc=v; });
   }
   if(n.type==="keyboard"){
-    const KEYS=[{value:" ",label:"SPACE"},{value:"enter",label:"ENTER"},
-      {value:"arrowup",label:"↑"},{value:"arrowdown",label:"↓"},{value:"arrowleft",label:"←"},{value:"arrowright",label:"→"},
-      {value:"w",label:"W"},{value:"a",label:"A"},{value:"s",label:"S"},{value:"d",label:"D"},
-      {value:"z",label:"Z"},{value:"x",label:"X"}];
-    selRow("KEY", KEYS, ()=>n.keyCode||" ", v=>{ n.keyCode=v; });
+    selRow("Key", KEY_OPTS.filter(o=>o.value!==""), ()=>n.keyCode||" ", v=>{ n.keyCode=v; });
   }
-  if(n.type==="sound"){ numRow("PITCH", ()=>n.pitch||440, v=>{ n.pitch=Math.max(50,v); });
-    selRow("WAVE", [{value:"square",label:"SQUARE"},{value:"sine",label:"SINE"},{value:"triangle",label:"TRIANGLE"},{value:"sawtooth",label:"SAW"}], ()=>n.wave||"square", v=>{ n.wave=v; }); }
-  if(n.type==="velocity"){ numRow("FRAMES", ()=>n.frames||5, v=>{ n.frames=Math.max(1,Math.round(v)); }); }
-  if(n.type==="contact"){ txtRow("WITH TAG", ()=>n.withTag||"", v=>{ n.withTag=v; }); }
-  if(n.type==="bg"){ colRow("COLOR", ["#0a0b10","#0d2137","#13233a","#182a18","#2a182a","#3a2a10","#eef0f4","#000000"], ()=>n.color||"#0a0b10", v=>{ n.color=v; }); }
-  if(n.type==="setting"){ numRow("GRAVITY", ()=>n.gravity||2200, v=>{ n.gravity=Math.max(0,v); });
-    selRow("SCREEN", [{value:"yoko",label:"YOKO(横)"},{value:"tate",label:"TATE(縦)"}], ()=>n.orient||"yoko", v=>{ n.orient=v; });
+  if(n.type==="sound"){ numRow("Pitch", ()=>n.pitch||440, v=>{ n.pitch=Math.max(50,v); });
+    selRow("Wave", [{value:"square",label:"Square"},{value:"sine",label:"Sine"},{value:"triangle",label:"Triangle"},{value:"sawtooth",label:"Saw"}], ()=>n.wave||"square", v=>{ n.wave=v; }); }
+  if(n.type==="velocity"){ numRow("Frames", ()=>n.frames||5, v=>{ n.frames=Math.max(1,Math.round(v)); }); }
+  if(n.type==="contact"){ txtRow("With Tag", ()=>n.withTag||"", v=>{ n.withTag=v; }); }
+  if(n.type==="bg"){ colRow("Color", OBJ_COLORS, ()=>n.color||"#0a0b10", v=>{ n.color=v; }); }
+  if(n.type==="setting"){ numRow("Gravity", ()=>n.gravity||2200, v=>{ n.gravity=Math.max(0,v); });
+    selRow("Screen", [{value:"yoko",label:"Yoko(横)"},{value:"tate",label:"Tate(縦)"}], ()=>n.orient||"yoko", v=>{ n.orient=v; });
     numRow("FPS", ()=>n.fps||60, v=>{ n.fps=Math.max(10,Math.min(120,Math.round(v))); }); }
   if(n.type==="shot"){
-    txtRow("DESTROY TAG", ()=>n.destroyTag||"", v=>{ n.destroyTag=v; });
-    numRow("BULLET SPD", ()=>n.bulletSpd||400, v=>{ n.bulletSpd=v; });
-    numRow("BULLET SIZE", ()=>n.bulletSize||14, v=>{ n.bulletSize=Math.max(2,v); });
-    colRow("BULLET COLOR", OBJ_COLORS, ()=>n.bulletColor||"#ffe08a", v=>{ n.bulletColor=v; });
+    txtRow("Destroy Tag", ()=>n.destroyTag||"", v=>{ n.destroyTag=v; });
+    numRow("Bullet Speed", ()=>n.bulletSpd||400, v=>{ n.bulletSpd=v; });
+    numRow("Bullet Size", ()=>n.bulletSize||14, v=>{ n.bulletSize=Math.max(2,v); });
+    colRow("Bullet Color", OBJ_COLORS, ()=>n.bulletColor||"#ffe08a", v=>{ n.bulletColor=v; });
+  }
+  // 幾何プロパティ（STICK/BUTTONは独自UIなので除外）＝ Unity順: W/H → Angle → Color/Flip/Dynamics → Tag → Layer
+  const hasGeom = d.object || d.stage==="text" || d.stage==="shot" || d.stage==="rotate";
+  if(hasGeom){
+    numRow("Width",  ()=>n.w||80,  v=>{ n.w=Math.max(16,v); });
+    numRow("Height", ()=>n.h||80,  v=>{ n.h=Math.max(16,v); });
+    numRow("Angle",  ()=>n.angle||0, v=>{ n.angle=v; });
   }
   if(d.object){
-    // DYNAMICS（物理演算）
-    chkRow("DYNAMICS", ()=>n.dyn, v=>{ n.dyn=v; });
-    numRow("BOUNCE",   ()=>Math.round((n.bounce||0)*100), v=>{ n.bounce=Math.min(1,Math.max(0,v/100)); });
-    numRow("FRICTION", ()=>Math.round((n.friction||0)*100), v=>{ n.friction=Math.min(1,Math.max(0,v/100)); });
-    chkRow("FLIP",     ()=>n.flip, v=>{ n.flip=v; });
-    colRow("COLOR", OBJ_COLORS, ()=>n.color, v=>{ n.color=v; });
+    colRow("Color", OBJ_COLORS, ()=>n.color, v=>{ n.color=v; });
+    chkRow("Flip",     ()=>n.flip, v=>{ n.flip=v; });
+    chkRow("Dynamics", ()=>n.dyn, v=>{ n.dyn=v; });
+    numRow("Bounce",   ()=>Math.round((n.bounce||0)*100), v=>{ n.bounce=Math.min(1,Math.max(0,v/100)); });
+    numRow("Friction", ()=>Math.round((n.friction||0)*100), v=>{ n.friction=Math.min(1,Math.max(0,v/100)); });
   }
-  if(d.object || d.stage){
-    // W / H / ANGLE（ハンドルでも変更可）＋ SORTLAYER・タグ
-    numRow("WIDTH",  ()=>n.w||80,  v=>{ n.w=Math.max(16,v); });
-    numRow("HEIGHT", ()=>n.h||80,  v=>{ n.h=Math.max(16,v); });
-    numRow("ANGLE",  ()=>n.angle||0, v=>{ n.angle=v; });
-    numRow("LAYER",  ()=>n.layer||50, v=>{ n.layer=Math.round(v); });
-    txtRow("TAG",    ()=>n.tag||"", v=>{ n.tag=v; });
+  if(hasGeom){
+    txtRow("Tag",   ()=>n.tag||"", v=>{ n.tag=v; });
+    numRow("Layer", ()=>n.layer||50, v=>{ n.layer=Math.round(v); });
   }
   if(d.target){ // GETPOS / GETROT の対象オブジェクト
     const r=document.createElement("div"); r.className="prow";
@@ -1396,6 +1433,10 @@ function refreshProp(){
     eb.onclick=()=> openTexEditor(n.id);
     propPanel.appendChild(eb);
   }
+  const dup=document.createElement("button"); dup.className="del"; dup.style.background="#2f7a4a"; dup.style.borderColor="#3fa060";
+  dup.textContent="DUPLICATE";
+  dup.onclick=()=>{ const c=duplicateNodes([n.id]); const nid=c&&c.size?[...c][0]:n.id; propNode=nid; selected=nid; refreshProp(); };
+  propPanel.appendChild(dup);
   const del=document.createElement("button"); del.className="del"; del.textContent="DELETE";
   del.onclick=()=>{ recordUndo(); removeNode(n.id); if(selected===n.id) selected=null; propNode=null; refreshProp(); };
   propPanel.appendChild(del);
@@ -1539,8 +1580,12 @@ function deserialize(s){ const o=JSON.parse(s); nodes=o.nodes||[]; conns=o.conns
     if(n.type==="text"&&n.text==null) n.text="TEXT";
     if(n.type==="text"&&n.fontSize==null) n.fontSize=40;
     if(n.type==="stick"){ if(n.mode==null)n.mode="analog"; if(n.threshold==null)n.threshold=0.3;
-      if(n.limitAxis==null)n.limitAxis=false; if(n.useKey==null)n.useKey=false; if(n.visible==null)n.visible=true; }
-    if(n.type==="button"){ if(n.output==null)n.output="momentary"; if(n.useKey==null)n.useKey=false; if(n.visible==null)n.visible=true; }
+      if(n.limitAxis==null)n.limitAxis=false; if(n.visible==null)n.visible=true;
+      if(n.style==null)n.style="frame"; if(n.keyMode==null)n.keyMode=(n.useKey?"wasd":"off");
+      if(n.cntlMode==null)n.cntlMode="off"; if(n.hideOnPc==null)n.hideOnPc=false; }
+    if(n.type==="button"){ if(n.output==null)n.output="momentary"; if(n.visible==null)n.visible=true;
+      if(n.style==null)n.style="frame"; if(n.keyCode==null)n.keyCode=(n.useKey?" ":"");
+      if(n.cntlBtn==null)n.cntlBtn="off"; if(n.hideOnPc==null)n.hideOnPc=false; }
   } });
   nodes.forEach(n=>{ if(NODE_TYPES[n.type]&&n.type==="keyboard"&&n.keyCode==null) n.keyCode=" "; });
   nodes.forEach(n=>{ if(isStage(n)&&n.parentNodeId) recomputeLocal(n); }); // 親子ローカル復元

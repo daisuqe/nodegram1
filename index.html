@@ -43,8 +43,8 @@
   /* テクスチャエディタ */
   #texBar { position:absolute; left:0; right:0; bottom:0; z-index:16; background:rgba(20,22,30,.96);
     border-top:1px solid #2a2e3a; padding:10px; display:none; }
-  #texPalette { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:10px; }
-  #texPalette .sw { width:40px; height:40px; border-radius:8px; border:2px solid #3a4150; cursor:pointer; }
+  #texPalette { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:10px; max-height:120px; overflow-y:auto; }
+  #texPalette .sw { width:30px; height:30px; border-radius:7px; border:2px solid #3a4150; cursor:pointer; flex:0 0 auto; }
   #texPalette .sw.sel { border-color:#fff; transform:scale(1.12); }
   #texPalette .sw.eraser { background:repeating-conic-gradient(#555 0% 25%, #888 0% 50%) 50%/14px 14px; }
   #texTools { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
@@ -57,9 +57,10 @@
     border-radius:14px; padding:12px; display:none; box-shadow:0 10px 32px rgba(0,0,0,.6);
     max-height:calc(100vh - 24px); overflow-y:auto; }
   #createMenu .title { color:#8a92a6; font-size:13px; font-weight:800; padding:2px 4px 10px; letter-spacing:.05em; }
-  #createMenu .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  #createMenu .ci { height:56px; padding:0 16px; border-radius:12px; border:1px solid #333a49; background:#242a37;
-    color:#e6e9ef; font-size:17px; font-weight:800; cursor:pointer; display:flex; align-items:center; }
+  #createMenu .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  #createMenu .ci { height:52px; padding:0 8px; border-radius:11px; border:1px solid rgba(0,0,0,.35);
+    color:#fff; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    text-align:center; text-shadow:0 1px 2px rgba(0,0,0,.5); }
   #createMenu .ci:active { background:#2f3646; }
 
   /* 複数選択メニュー（Duplicate/Delete） */
@@ -126,6 +127,8 @@
 
 <script>
 "use strict";
+// Unity版のカラーパレット（プロジェクト由来）
+const UNITY_PALETTE=["#ffffff","#f4e8ff","#ddb4ff","#c785ff","#e8fbff","#cdf8ff","#86edff","#f7ffe7","#e6ffb4","#d8ff85","#ffe8e8","#ffb4b4","#ff8685","#eeeeee","#8800ff","#500099","#21004b","#00d7ff","#00acce","#066f85","#acff00","#91db02","#538000","#fe0002","#cd0000","#800000","#dadada","#bc99db","#846d99","#5a5164","#9acedb","#587b7f","#32454b","#c3dc9a","#8a9a6b","#384b14","#db5554","#813d3c","#4b1515","#b5b5b5","#fee8ff","#fbb4ff","#f986fd","#e7f4fd","#b4d7ff","#85bfff","#cdffd5","#9affac","#65ff81","#fff2e9","#ffd5b3","#ffb985","#919191","#f300ff","#c101d0","#7b007f","#0080ff","#005fcd","#003781","#00da1a","#009b0c","#005700","#ff6900","#c95407","#7f3100","#6c6c6c","#d799da","#7e3d81","#48164b","#99b7db","#3c5d80","#152e4c","#83c48e","#57805e","#152e1b","#dcb598","#7f5a3f","#4a2e16","#494748","#ffe7f5","#ffb4e4","#ff86cd","#ebecff","#d1cdff","#a29aff","#e7fffa","#b3fff2","#85ffe8","#fffee9","#fffbb4","#fff000","#2a2a2a","#ff0098","#d2007b","#7f0049","#0d00ff","#0000b3","#00004b","#00ffd1","#00cea4","#008265","#fff000","#cebf00","#807700","#000000","#da9abf","#80506a","#4b1634","#b2afda","#656281","#3c374b","#98dacc","#699b92","#164c3f","#bfbc85","#817f58","#4a492d"];
 // =====================================================================
 //  nodegram (web prototype)  — Unityを使わないHTML版の骨組み
 //  ・ノード編集：追加 / 移動 / 端子ドラッグで接続 / ×で削除 / 値編集
@@ -142,15 +145,15 @@ const NODE_TYPES = {
   keyboard:{ label:"KEYBOARD", glyph:"KBD",  inputs:[], outputs:["="],       color:"#e0892b" },
   touch:   { label:"TOUCH",    glyph:"TCH",  inputs:[], outputs:["X","Y","P"], color:"#e0892b" },
   // 計算系（青）
-  add:    { label:"PLUS",    glyph:"＋",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
-  sub:    { label:"MINUS",   glyph:"－",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
-  mul:    { label:"MULT",    glyph:"×",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
-  div:    { label:"DIV",     glyph:"÷",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
-  root:   { label:"ROOT",    glyph:"√",    inputs:["x"],     outputs:["="], color:"#3b7ddd" },
+  add:    { label:"＋",   glyph:"＋",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  sub:    { label:"－",   glyph:"－",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  mul:    { label:"×",    glyph:"×",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  div:    { label:"÷",    glyph:"÷",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  root:   { label:"√",    glyph:"√",    inputs:["x"],     outputs:["="], color:"#3b7ddd" },
   compare:{ label:"COMPARE", glyph:"＞",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
   not:    { label:"NOT",     glyph:"！",   inputs:["x"],     outputs:["="], color:"#3b7ddd" },
-  arctan: { label:"ARCTAN",  glyph:"atan", inputs:["y","x"], outputs:["="], color:"#3b7ddd" },
-  angletopos:{ label:"ANGLE→POS", glyph:"A→P", inputs:["a"], outputs:["X","Y"], color:"#3b7ddd" },
+  arctan: { label:"POS ANGLE",  glyph:"PtA", inputs:["y","x"], outputs:["="], color:"#3b7ddd" },
+  angletopos:{ label:"ANGLE POS", glyph:"AtP", inputs:["a"], outputs:["X","Y"], color:"#3b7ddd" },
   random: { label:"RANDOM",  glyph:"RND",  inputs:[],        outputs:["="], color:"#3b7ddd" },
   int:    { label:"INT",     glyph:"INT",  inputs:["x"],     outputs:["="], color:"#3b7ddd" },
   // 応用計算系（水色）
@@ -181,10 +184,10 @@ const NODE_TYPES = {
 const isStage = n => { const d=NODE_TYPES[n.type]; return !!(d.object || d.stage); };
 const attachesToObject = n => ['texture','contact','onbreak'].includes(n.type);
 const PALETTE = ["const",
-  "stick","button","keyboard","touch",
   "add","sub","mul","div","root","compare","not","arctan","angletopos","random","int",
   "trigger","counter","var","array","getpos","getrot",
   "text","rect","circle","character","shot","sound",
+  "stick","button","keyboard","touch",
   "texture","contact","onbreak","rotate","velocity","screen",
   "bg","setting"];
 
@@ -234,7 +237,7 @@ function screenToStageLayout(sx,sy){ return { x:(sx-W/2)/layoutView.s + layoutVi
 function addNode(type, wx, wy){
   const d = NODE_TYPES[type];
   const n = { id: nextId++, type, x:wx, y:wy };
-  if (type==="const") n.value = 200;
+  if (type==="const") n.value = 1;
   if (d.object || d.stage){
     n.angle=0; n.playX=0; n.playY=0; n.layer=50; n.tag="";  // SORTLAYER・タグ
     if(d.object){ n.color=randObjColor(); n.w=80; n.h=80; n.bounce=0; n.friction=0.0; n.flip=false; }
@@ -407,7 +410,7 @@ function startPlay(){
   try{ if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(_audioCtx.state==="suspended") _audioCtx.resume(); }catch(e){} // 実機の音声許可
   // 親子ローカル座標を確定（Play中の追従に使用）
   nodes.forEach(n=>{ if(isStage(n)&&n.parentNodeId&&nodeById(n.parentNodeId)) recomputeLocal(n); });
-  document.getElementById("pad").style.display="block";
+  document.getElementById("pad").style.display="none"; // D-PADは表示しない（STICK/BUTTONノードで操作）
   const ph=document.getElementById("hint"); ph.textContent="矢印 / WASD で移動"; ph.classList.remove("hidden");
   document.getElementById("menuBtn").style.display="none"; // Play中はMENU非表示
   const b=document.getElementById("playBtn"); b.textContent="■"; b.style.background="#a12b2b";
@@ -472,8 +475,6 @@ function playStep(dt){
   updateStatefulNodes();
   const settingNode = nodes.find(n=>n.type==="setting");
   const G = settingNode ? (settingNode.gravity||GRAV) : GRAV;   // SETTINGで重力変更
-  const floorY = H/2 - 40;                 // 画面下の床（中心基準オフセット座標）
-  const wallL = -W/2 + 10, wallR = W/2 - 10;
   const objs = nodes.filter(n=>NODE_TYPES[n.type].object);
 
   // ROTATE：角速度で自身のplayAngleを回す（子が追従する）
@@ -512,13 +513,9 @@ function playStep(dt){
       if(n.vy>0){ n.playY = s.playY-(S.hh+hh); n.vy = -n.vy*bounce; if(Math.abs(n.vy)<40){n.vy=0; n.grounded=true;} }
       else if(n.vy<0){ n.playY = s.playY+(S.hh+hh); n.vy=0; } } }
 
-    // 床に着地（反発）
-    if(n.playY + hh >= floorY){ n.playY = floorY - hh; n.vy = -n.vy*bounce; if(Math.abs(n.vy)<40){n.vy=0; n.grounded=true;} }
     // 摩擦（接地時、速度入力が無ければ徐々に停止）
     if(n.grounded && fric>0 && !conns.some(c=>c.b===n.id&&c.bi===0)) n.vx*=(1-Math.min(1,fric));
-    // 画面端で止める
-    if(n.playX < wallL+hw) n.playX = wallL+hw;
-    if(n.playX > wallR-hw) n.playX = wallR-hw;
+    // 床・壁は自動生成しない（オブジェクトは限界まで落下・移動可能）
     // 向き（左右反転）
     if(n.flip){ if(n.vx>5) n._face=1; else if(n.vx<-5) n._face=-1; }
   }
@@ -802,11 +799,6 @@ function drawLayout(){
   // 中央十字ガイド
   ctx.strokeStyle="#2a313d"; ctx.lineWidth=1/S;
   ctx.beginPath(); ctx.moveTo(0,-H/2); ctx.lineTo(0,H/2); ctx.moveTo(-W/2,0); ctx.lineTo(W/2,0); ctx.stroke();
-  // 床の位置（重力ONオブジェクトがある場合）
-  if(nodes.some(n=>NODE_TYPES[n.type].object && n.dyn)){
-    const fy=H/2-40; ctx.strokeStyle="#3a4150"; ctx.lineWidth=2/S;
-    ctx.beginPath(); ctx.moveTo(-W/2,fy); ctx.lineTo(W/2,fy); ctx.stroke();
-  }
   // ステージ要素（ステージ座標で描画）
   for(const n of nodes){ if(!isStage(n)) continue; drawStage(n.layoutX||0, n.layoutY||0, n); }
   ctx.restore();
@@ -852,14 +844,7 @@ function drawPlay(){
   const bgNode = nodes.find(n=>n.type==="bg");
   ctx.fillStyle = bgNode ? (bgNode.color||"#0a0b10") : "#0a0b10"; ctx.fillRect(0,0,W,H);
   const camX=playCam.x, camY=playCam.y;
-  // 重力ONオブジェクトがある場合のみ床を描画（カメラ追従）
-  const hasGravity = nodes.some(n=>NODE_TYPES[n.type].object && n.dyn);
-  if(hasGravity){
-    const floorScreenY = H/2 + camY + (H/2 - 40);
-    ctx.fillStyle="#20252f"; ctx.fillRect(0, floorScreenY, W, H-floorScreenY);
-    ctx.strokeStyle="#3a4150"; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(0,floorScreenY); ctx.lineTo(W,floorScreenY); ctx.stroke();
-  }
+  // 床は自動描画しない（足場は静的オブジェクトで作る）
   // ステージ要素（SORTLAYER順、破壊済みは非表示、操作UIは画面固定）
   const uiTypes = new Set(["stick","button"]);
   const drawList = nodes.filter(n=>isStage(n) && !destroyed.has(n.id)
@@ -1115,11 +1100,11 @@ function playUp(pid){
 }
 
 // ===== テクスチャエディタ =====
-const TEX_PALETTE=["#ffffff","#000000","#e53935","#fb8c00","#fdd835","#43a047","#1e88e5","#8e24aa","#00acc1","#f06292","#8d6e63","#bdbdbd"];
-let texEditNode=null, texColor="#e53935", texEraser=false, texPressed=false, texGeom=null;
+const TEX_PALETTE=UNITY_PALETTE;   // Unity版パレットを使用
+let texEditNode=null, texColor=UNITY_PALETTE[0], texEraser=false, texPressed=false, texGeom=null;
 (function buildTexPalette(){
   const cont=document.getElementById("texPalette"); if(!cont) return;
-  TEX_PALETTE.forEach((col,i)=>{ const sw=document.createElement("div"); sw.className="sw"+(i===2?" sel":"");
+  TEX_PALETTE.forEach((col,i)=>{ const sw=document.createElement("div"); sw.className="sw"+(i===0?" sel":"");
     sw.style.background=col; sw.onclick=()=>{ texColor=col; texEraser=false; markTexSel(sw); }; cont.appendChild(sw); });
   const er=document.createElement("div"); er.className="sw eraser"; er.onclick=()=>{ texEraser=true; markTexSel(er); }; cont.appendChild(er);
 })();
@@ -1217,7 +1202,10 @@ cv.addEventListener("wheel", e=>{ e.preventDefault();
 let keys={}, pad={};
 let heldKeys=new Set();  // KEYBOARDノード/ボタン用：押下中のキー(小文字)
 const KMAP={ArrowUp:"U",ArrowDown:"D",ArrowLeft:"L",ArrowRight:"R",w:"U",s:"D",a:"L",d:"R",W:"U",S:"D",A:"L",D:"R"};
-window.addEventListener("keydown", e=>{ const k=KMAP[e.key]; if(k){ keys[k]=true; e.preventDefault(); }
+window.addEventListener("keydown", e=>{
+  // 入力欄の編集中はショートカット・削除を無効化（CONST値編集でノードが消えるのを防ぐ）
+  const ae=document.activeElement; if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+  const k=KMAP[e.key]; if(k){ keys[k]=true; e.preventDefault(); }
   heldKeys.add(e.key.toLowerCase());
   if((e.key==="Delete"||e.key==="Backspace") && mode==="edit"){
     if(multiSel.size){ recordUndo(); [...multiSel].forEach(id=>removeNode(id)); multiSel.clear(); selected=null; }
@@ -1245,7 +1233,7 @@ const createMenu=document.getElementById("createMenu");
   const row=document.createElement("div"); row.className="row";
   PALETTE.forEach(t=>{ const d=NODE_TYPES[t];
     const b=document.createElement("div"); b.className="ci";
-    b.innerHTML=`<span class="swatch" style="background:${d.color}"></span>${d.label}`;
+    b.textContent=d.label; b.style.background=d.color;                 // ボタン背景＝カテゴリ色
     b.onclick=(e)=>{ e.stopPropagation();
       if(createMenu._w){ recordUndo(); addNode(t, createMenu._w.x, createMenu._w.y); }
       hideCreateMenu(); };
@@ -1310,14 +1298,13 @@ function refreshProp(){
     const lb=document.createElement("label"); lb.textContent=label;
     const inp=document.createElement("input"); inp.type="text"; inp.value=get()||"";
     inp.oninput=()=>set(inp.value); r.appendChild(lb); r.appendChild(inp); propPanel.appendChild(r); };
-  const OBJ_COLORS=["#ff5a5a","#ffb43a","#ffe23a","#4ade80","#3ad0ff","#5b8cff","#c084fc","#f472b6","#ffffff","#8d6e63","#20232b","#000000"];
+  const OBJ_COLORS=UNITY_PALETTE;
   const colRow=(label,palette,get,set)=>{ const r=document.createElement("div"); r.className="prow";
     const lb=document.createElement("label"); lb.textContent=label;
-    const box=document.createElement("div"); box.style.cssText="display:flex;flex-wrap:wrap;gap:6px;flex:1;justify-content:flex-end";
-    palette.forEach(col=>{ const sw=document.createElement("div");
-      sw.style.cssText=`width:28px;height:28px;border-radius:6px;background:${col};cursor:pointer;border:2px solid ${get()===col?'#fff':'#333a49'}`;
-      sw.onclick=()=>{ set(col); refreshProp(); }; box.appendChild(sw); });
-    r.appendChild(lb); r.appendChild(box); propPanel.appendChild(r); };
+    const cur=document.createElement("div"); // 現在色＋タップでパレットを開く
+    cur.style.cssText=`width:56px;height:38px;border-radius:8px;background:${get()};cursor:pointer;border:2px solid #fff`;
+    cur.onclick=()=> openColorPicker(get(), col=>{ set(col); refreshProp(); });
+    r.appendChild(lb); r.appendChild(cur); propPanel.appendChild(r); };
   const cl=document.createElement("button"); cl.className="pclose"; cl.textContent="×";
   cl.onclick=()=>{ propNode=null; refreshProp(); };
   t.appendChild(cl);
@@ -1425,6 +1412,7 @@ document.getElementById("playBtn").onclick=()=> (mode==="play")?stopPlay():start
 const menuBtn=document.getElementById("menuBtn");
 const flick=document.getElementById("flick");
 const FLICK_ITEMS=[
+  { key:"newnode", label:"NEW NODE", color:"#2f5a8a", run:()=>{ if(mode==="edit") showCreateMenu(W/2, Math.max(120,H*0.4)); } },
   { key:"save", label:"SAVE", color:"#c0392b", run:()=>openSaveDialog() },
   { key:"load", label:"LOAD", color:"#2b6fd0", run:()=>openLoadDialog() },
   { key:"undo", label:"UNDO", color:"#6b5bd0", run:()=>undo() },
@@ -1505,6 +1493,15 @@ function modal(build){ const ov=document.createElement("div");
   document.getElementById("app").appendChild(ov); return ov; }
 function mkBtn(label,bg){ const b=document.createElement("button");
   b.textContent=label; b.style.cssText=`height:46px;padding:0 16px;border-radius:10px;border:1px solid #3a4150;background:${bg||'#242a37'};color:#fff;font-size:15px;font-weight:800;cursor:pointer`; return b; }
+// カラーピッカー（Unity版パレット）
+function openColorPicker(current, onPick){ modal((box,close)=>{
+  const t=document.createElement("div"); t.textContent="COLOR"; t.style.cssText="color:#fff;font-size:18px;font-weight:800;margin-bottom:12px"; box.appendChild(t);
+  const grid=document.createElement("div"); grid.style.cssText="display:grid;grid-template-columns:repeat(9,1fr);gap:6px";
+  UNITY_PALETTE.forEach(col=>{ const sw=document.createElement("div");
+    sw.style.cssText=`width:30px;height:30px;border-radius:6px;background:${col};cursor:pointer;border:2px solid ${current===col?'#fff':'rgba(255,255,255,.2)'}`;
+    sw.onclick=()=>{ onPick(col); close(); }; grid.appendChild(sw); });
+  box.appendChild(grid);
+}); }
 
 function openSaveDialog(){ modal((box,close)=>{
   const t=document.createElement("div"); t.textContent="SAVE"; t.style.cssText="color:#fff;font-size:18px;font-weight:800;margin-bottom:12px"; box.appendChild(t);
@@ -1579,13 +1576,13 @@ function sample(){
   const mx=addNode("mul",70,-150);
   const my=addNode("mul",70,50);
   const rc=addNode("rect",330,-60); rc.color="#3ad0ff"; rc.dyn=true; // プレイヤー（重力ON）
-  rc.w=70; rc.h=70; rc.layoutX=-120; rc.layoutY=-180;
+  rc.w=70; rc.h=70; rc.layoutX=0; rc.layoutY=-200;
   connect(stk.id,0, mx.id,0); connect(spd.id,0, mx.id,1);
   connect(stk.id,1, my.id,0); connect(spd.id,0, my.id,1);
   connect(mx.id,0, rc.id,0);  connect(my.id,0, rc.id,1);
-  // 静的な足場（重力OFF＝乗れるブロック）
+  // 静的な足場（重力OFF＝乗れるブロック）。床はこの足場のみ（画面下の自動床なし）
   const plat=addNode("rect",330,140); plat.color="#c084fc"; plat.dyn=false;
-  plat.w=280; plat.h=40; plat.layoutX=120; plat.layoutY=40;
+  plat.w=320; plat.h=40; plat.layoutX=0; plat.layoutY=80;
   centerReadable();
 }
 sample();

@@ -21,7 +21,8 @@
     display:flex; align-items:center; justify-content:center; font-weight:800; cursor:pointer;
     border:1px solid rgba(0,0,0,.35); user-select:none; }
   .cplay { top:14px; background:#1f7a3a; color:#fff; font-size:34px; }
-  .cplay.stop { background:#a12b2b; }
+  .cplay.stop { background:transparent; border-color:transparent; }
+  .cplay .stopsq { width:38px; height:38px; border-radius:9px; border:4px solid #fff; background:transparent; }
   .cmenu { top:98px; background:#3b4250; color:#dff2ff; font-size:19px; letter-spacing:.03em; }
   .cmenu:active { background:#4a5262; }
   #flick { position:absolute; inset:0; z-index:11; display:none; }
@@ -41,16 +42,14 @@
   .hidden { display:none !important; }
 
   /* テクスチャエディタ */
-  #texBar { position:absolute; left:0; right:0; bottom:0; z-index:16; background:rgba(20,22,30,.96);
-    border-top:1px solid #2a2e3a; padding:10px; display:none; }
-  #texPalette { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:10px; max-height:120px; overflow-y:auto; }
-  #texPalette .sw { width:30px; height:30px; border-radius:7px; border:2px solid #3a4150; cursor:pointer; flex:0 0 auto; }
-  #texPalette .sw.sel { border-color:#fff; transform:scale(1.12); }
-  #texPalette .sw.eraser { background:repeating-conic-gradient(#555 0% 25%, #888 0% 50%) 50%/14px 14px; }
-  #texTools { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
-  #texTools .btn { height:44px; padding:0 16px; border-radius:10px; border:1px solid #333a49;
-    background:#242a37; color:#e6e9ef; font-size:15px; font-weight:700; cursor:pointer; }
-  #texTools .btn:active { background:#2f3646; }
+  #texBar { position:absolute; left:12px; top:78px; z-index:16; display:none; flex-direction:column; gap:10px; }
+  #texBar .tbtn { width:78px; height:46px; border-radius:10px; border:1px solid #333a49;
+    background:#242a37; color:#e6e9ef; font-size:15px; font-weight:800; cursor:pointer; }
+  #texBar .tbtn.active { background:#21b3d6; border-color:#21b3d6; color:#fff; }
+  #texWork { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+  #texWork .tsw { width:35px; height:35px; border-radius:8px; border:3px solid #cfd6e4; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.5); }
+  #texWork .tsw.sel { border-color:#ffcc00; transform:scale(1.1); }
+  #texCloseBtn { position:absolute; top:14px; right:14px; z-index:17; display:none; }
 
   /* 背景長押しの Create New Node メニュー */
   #createMenu { position:absolute; z-index:20; background:rgba(28,32,42,.98); border:1px solid #3a4150;
@@ -58,7 +57,7 @@
     max-height:calc(100vh - 24px); overflow-y:auto; }
   #createMenu .title { color:#8a92a6; font-size:13px; font-weight:800; padding:2px 4px 10px; letter-spacing:.05em; }
   #createMenu .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
-  #createMenu .ci { height:52px; padding:0 8px; border-radius:11px; border:1px solid rgba(0,0,0,.35);
+  #createMenu .ci { height:36px; padding:0 8px; border-radius:11px; border:1px solid rgba(0,0,0,.35);
     color:#fff; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center;
     text-align:center; text-shadow:0 1px 2px rgba(0,0,0,.5); }
   #createMenu .ci:active { background:#2f3646; }
@@ -76,9 +75,9 @@
     background:rgba(28,32,42,.98); border:1px solid #3a4150; border-radius:14px; padding:16px 18px; display:none;
     min-width:240px; box-shadow:0 12px 36px rgba(0,0,0,.6); }
   #propPanel .pt { color:#fff; font-size:17px; font-weight:800; margin-bottom:10px; display:flex; align-items:center; }
-  #propPanel .pclose { margin-left:auto; width:34px; height:34px; border-radius:8px; border:1px solid #3a4150;
-    background:#2a3040; color:#fff; font-size:20px; font-weight:800; cursor:pointer; line-height:1; }
-  #propPanel .pclose:active { background:#3a4150; }
+  .pclose { margin-left:auto; width:44px; height:44px; border-radius:8px; border:1px solid #2a91ad;
+    background:#21b3d6; color:#fff; font-size:40px; font-weight:800; cursor:pointer; line-height:1; }
+  .pclose:active { background:#1a94b3; }
   #propPanel .prow { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
   #propPanel label { color:#9aa3b5; font-size:13px; font-weight:700; }
   #propPanel input { flex:1; width:110px; height:44px; border-radius:9px; border:1px solid #3a4150; background:#181c26;
@@ -112,17 +111,14 @@
   <div id="multiMenu"></div>
   <div id="propPanel"></div>
 
-  <!-- テクスチャエディタのツールバー -->
+  <!-- テクスチャエディタのツール（左に縦並び）＋右上に閉じる -->
   <div id="texBar">
-    <div id="texPalette"></div>
-    <div id="texTools">
-      <button class="btn" data-sz="8">8</button>
-      <button class="btn" data-sz="16">16</button>
-      <button class="btn" data-sz="32">32</button>
-      <button class="btn" id="texClear">CLEAR</button>
-      <button class="btn" id="texClose">CLOSE</button>
-    </div>
+    <button class="tbtn" id="texDraw">Draw</button>
+    <button class="tbtn" id="texErase">Erase</button>
+    <button class="tbtn" id="texPick">Pick</button>
+    <div id="texWork"></div>
   </div>
+  <button id="texCloseBtn" class="pclose">×</button>
 </div>
 
 <script>
@@ -139,49 +135,51 @@ const UNITY_PALETTE=["#ffffff","#f4e8ff","#ddb4ff","#c785ff","#e8fbff","#cdf8ff"
 // ---- ノード種別の定義（色は元nodegramのカテゴリ配色に対応）----
 const NODE_TYPES = {
   const:  { label:"CONST",  glyph:"",     inputs:[],              outputs:["n"],     color:"#3aae4a" }, // 緑：入力/定数
-  // 操作系（橙）
-  stick:   { label:"STICK",    glyph:"STK",  inputs:[], outputs:["X","Y"],   color:"#e0892b", stage:"stick"  },
-  button:  { label:"BUTTON",   glyph:"BTN",  inputs:[], outputs:["="],       color:"#e0892b", stage:"button" },
+  // 操作系（橙）  ※Unity: Stick/Button 入力0=可視性(V)、Stick 出力X,Y、Touch 出力X,Y,S
+  stick:   { label:"STICK",    glyph:"STK",  inputs:["V"], outputs:["X","Y"],   color:"#e0892b", stage:"stick"  },
+  button:  { label:"BUTTON",   glyph:"BTN",  inputs:["V"], outputs:["="],       color:"#e0892b", stage:"button" },
   keyboard:{ label:"KEYBOARD", glyph:"KBD",  inputs:[], outputs:["="],       color:"#e0892b" },
-  touch:   { label:"TOUCH",    glyph:"TCH",  inputs:[], outputs:["X","Y","P"], color:"#e0892b" },
-  // 計算系（青）
-  add:    { label:"＋",   glyph:"＋",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
-  sub:    { label:"－",   glyph:"－",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
-  mul:    { label:"×",    glyph:"×",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
-  div:    { label:"÷",    glyph:"÷",    inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  touch:   { label:"TOUCH",    glyph:"TCH",  inputs:[], outputs:["X","Y","S"], color:"#e0892b" },
+  // 計算系（青）  ※Unity: Plus 入力1(多重接続で合算)、Minus/Mult/Dev 入力A,B、Arctan 入力X,Y
+  add:    { label:"＋",   glyph:"＋",   inputs:["+"],     outputs:["="], color:"#3b7ddd" },
+  sub:    { label:"－",   glyph:"－",   inputs:["A","B"], outputs:["="], color:"#3b7ddd" },
+  mul:    { label:"×",    glyph:"×",    inputs:["A","B"], outputs:["="], color:"#3b7ddd" },
+  div:    { label:"÷",    glyph:"÷",    inputs:["A","B"], outputs:["="], color:"#3b7ddd" },
   root:   { label:"√",    glyph:"√",    inputs:["x"],     outputs:["="], color:"#3b7ddd" },
-  compare:{ label:"COMPARE", glyph:"＞",   inputs:["a","b"], outputs:["="], color:"#3b7ddd" },
+  compare:{ label:"COMPARE", glyph:"＞",   inputs:["A","B"], outputs:["="], color:"#3b7ddd" },
   not:    { label:"NOT",     glyph:"！",   inputs:["x"],     outputs:["="], color:"#3b7ddd" },
-  arctan: { label:"POS ANGLE",  glyph:"PtA", inputs:["y","x"], outputs:["="], color:"#3b7ddd" },
+  arctan: { label:"POS ANGLE",  glyph:"PtA", inputs:["X","Y"], outputs:["="], color:"#3b7ddd" },
   angletopos:{ label:"ANGLE POS", glyph:"AtP", inputs:["a"], outputs:["X","Y"], color:"#3b7ddd" },
-  random: { label:"RANDOM",  glyph:"RND",  inputs:[],        outputs:["="], color:"#3b7ddd" },
+  random: { label:"RANDOM",  glyph:"RND",  inputs:["T"],     outputs:["="], color:"#3b7ddd" }, // 入力0=トリガー
   int:    { label:"INT",     glyph:"INT",  inputs:["x"],     outputs:["="], color:"#3b7ddd" },
-  // 応用計算系（水色）
-  trigger:{ label:"TRIGGER", glyph:"DLY", inputs:["in","F"],      outputs:["="],     color:"#22b8c0" },
-  counter:{ label:"COUNTER", glyph:"CNT", inputs:["up","rst"],    outputs:["="],     color:"#22b8c0" },
-  var:    { label:"VAR",     glyph:"VAR", inputs:["val","set"],   outputs:["="],     color:"#22b8c0" },
-  array:  { label:"ARRAY",   glyph:"ARR", inputs:["i","val","wr"],outputs:["="],     color:"#22b8c0" },
-  getpos: { label:"GETPOS",  glyph:"GPS", inputs:[],              outputs:["X","Y"], color:"#22b8c0", target:true },
-  getrot: { label:"GETROT",  glyph:"GRT", inputs:[],              outputs:["R"],     color:"#22b8c0", target:true },
-  // 出力系（紫）
-  text:     { label:"TEXT",   glyph:"T",    inputs:["val"],       outputs:[], color:"#8a3bd0", stage:"text"   },
-  rect:     { label:"RECT",   glyph:"▭",   inputs:["vx","vy"],   outputs:[], color:"#8a3bd0", object:"rect"  },
-  circle:   { label:"CIRCLE", glyph:"〇",   inputs:["vx","vy"],   outputs:[], color:"#8a3bd0", object:"circle"},
-  character:{ label:"CHARACTER", glyph:"CHR", inputs:["vx","vy"], outputs:[], color:"#8a3bd0", object:"rect"  },
-  shot:     { label:"SHOT",   glyph:"SHOT", inputs:["fire","spd"],outputs:[], color:"#8a3bd0", stage:"shot"   },
-  sound:    { label:"SOUND",  glyph:"SND",  inputs:["play"],      outputs:[], color:"#8a3bd0" },
-  // その他（黄）
+  // 応用計算系（水色）  ※Unity: Trigger 入力1(遅延はProperty)、Counter 入力1、Var 入力V,S、Array 入力V,I,S
+  trigger:{ label:"TRIGGER", glyph:"TRG", inputs:["in"],          outputs:["="],     color:"#22b8c0" },
+  counter:{ label:"COUNTER", glyph:"COU", inputs:["up"],          outputs:["="],     color:"#22b8c0" },
+  var:    { label:"VAR",     glyph:"VAR", inputs:["V","S"],       outputs:["="],     color:"#22b8c0" },
+  array:  { label:"ARRAY",   glyph:"ARR", inputs:["V","I","S"],   outputs:["="],     color:"#22b8c0" },
+  getpos: { label:"GETPOS",  glyph:"GPos", inputs:[],             outputs:["X","Y"], color:"#22b8c0" },
+  getrot: { label:"GETROT",  glyph:"GRot", inputs:[],             outputs:["R"],     color:"#22b8c0" },
+  // 出力系（紫）  ※Unity: Text 入力T,V／Rect/Circle 入力X,Y,V／Character 入力X,Y,J／Shot 入力1／Sound 入力T,S
+  text:     { label:"TEXT",   glyph:"T",    inputs:["T","V"],       outputs:[], color:"#8a3bd0", stage:"text"   },
+  rect:     { label:"RECT",   glyph:"▭",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"rect"  },
+  circle:   { label:"CIRCLE", glyph:"〇",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"circle"},
+  character:{ label:"CHARACTER", glyph:"CHR", inputs:["X","Y","J"], outputs:[], color:"#8a3bd0", object:"rect"  },
+  shot:     { label:"SHOT",   glyph:"SHOT", inputs:["fire"],      outputs:[], color:"#8a3bd0", stage:"shot"   },
+  sound:    { label:"SOUND",  glyph:"SND",  inputs:["T","S"],     outputs:[], color:"#8a3bd0" },
+  // その他（黄）  ※Unity: Texture 入力1(Visible)／Screen 入力X,Y,S 出力W,H／Velocity 出力X,Y
   texture:  { label:"TEXTURE",glyph:"TEX",  inputs:["V"],         outputs:[], color:"#e0c020", tex:true },
   contact:  { label:"CONTACT",glyph:"CON",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
   onbreak:  { label:"ONBREAK",glyph:"BRK",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
   rotate:   { label:"ROTATE", glyph:"ROT",  inputs:["av"],        outputs:[], color:"#e0c020", stage:"rotate" },
   velocity: { label:"VELOCITY",glyph:"VEL", inputs:[],            outputs:["X","Y"], color:"#e0c020", target:true },
-  screen:   { label:"SCREEN", glyph:"SCR",  inputs:[],            outputs:[], color:"#e0c020", target:true },
+  screen:   { label:"SCREEN", glyph:"SCR",  inputs:["X","Y","S"], outputs:["W","H"], color:"#e0c020", target:true },
   // シーン設定（灰）
   bg:       { label:"BG",     glyph:"BG",   inputs:[],            outputs:[], color:"#6b7280" },
   setting:  { label:"SETTING",glyph:"SET",  inputs:[],            outputs:[], color:"#6b7280" },
 };
 const isStage = n => { const d=NODE_TYPES[n.type]; return !!(d.object || d.stage); };
+// レイアウト画面に表示・配置する対象（オブジェクト系＋オブジェクトに付随する CONTACT/ONBREAK/TEXTURE）
+const showsInLayout = n => isStage(n) || attachesToObject(n);
 const attachesToObject = n => ['texture','contact','onbreak'].includes(n.type);
 const PALETTE = ["const",
   "add","sub","mul","div","root","compare","not","arctan","angletopos","random","int",
@@ -195,10 +193,18 @@ const PALETTE = ["const",
 const NS = 130, PORT_R = 20; // 端子を1.3倍に
 function nodeHeight(t){ return NS; }
 // ノードに表示する1〜3文字（元nodegramのシンボル表示に対応）
+const CMP_GLYPH={eq:"＝",gt:"＞",lt:"＜",ne:"≠",ge:"≧",le:"≦"};
+// ノード表記の明示指定（先頭以外小文字ルールの例外）
+const GLYPH_OVERRIDE={ getpos:"GPos", getrot:"GRot", stick:"Stic", arctan:"PtA", angletopos:"AtP",
+  trigger:"Trig", text:"Text", sound:"Sund", counter:"Cunt", bg:"BG" };
 function nodeGlyph(n){
   if(n.type==="const") return String(n.value);
-  const d=NODE_TYPES[n.type];
-  return (d && (d.glyph||d.label)) || "?";
+  if(n.type==="compare") return CMP_GLYPH[n.compareMode||"gt"]||"＞";
+  if(GLYPH_OVERRIDE[n.type]) return GLYPH_OVERRIDE[n.type];
+  const d=NODE_TYPES[n.type]; let g=(d && (d.glyph||d.label)) || "?";
+  // ノード表記は先頭以外を小文字に（複数文字グリフのみ）
+  if(g.length>1) g = g.charAt(0)+g.slice(1).toLowerCase();
+  return g;
 }
 function glyphFontSize(g){ const L=[...String(g)].length;
   return (L<=1?0.84 : L===2?0.62 : L===3?0.48 : 0.36) * NS; } // 約1.4倍に拡大
@@ -206,6 +212,10 @@ function glyphFontSize(g){ const L=[...String(g)].length;
 // ---- 状態 ----
 let nodes = [];              // {id,type,x,y,value,color,size,playX,playY,vx,vy}
 let conns = [];             // {a:nodeId, ao:outPort, b:nodeId, bi:inPort}
+// アプリ共通設定（localStorage永続）
+let appSettings = { wireStyle:"curve" }; // ワイヤーの描画：曲線 or 直線
+try{ const s=localStorage.getItem("ng_appsettings"); if(s) Object.assign(appSettings, JSON.parse(s)); }catch(e){}
+function saveAppSettings(){ try{ localStorage.setItem("ng_appsettings", JSON.stringify(appSettings)); }catch(e){} }
 let view = { x:0, y:0, s:1 };
 let layoutView = { x:0, y:0, s:1 };  // レイアウト画面のパン・ズーム
 let nextId = 1;
@@ -240,16 +250,18 @@ function addNode(type, wx, wy){
   if (type==="const") n.value = 1;
   if (d.object || d.stage){
     n.angle=0; n.playX=0; n.playY=0; n.layer=50; n.tag="";  // SORTLAYER・タグ
-    if(d.object){ n.color=randObjColor(); n.w=80; n.h=80; n.bounce=0; n.friction=0.0; n.flip=false; }
-    else if(d.stage==="text"){ n.color="#8a3bd0"; n.w=240; n.h=70; n.text="TEXT"; n.fontSize=40; n.textColor="#ffffff"; n.align="center"; }
+    if(d.object){ n.color=randObjColor(); n.w=80; n.h=80; n.bounce=0; n.friction=0.0; n.flip=false;
+      n.objStyle="fill"; n.coordMode="local"; n.visible=true; n.destroyedBy=""; } // Unity: ObjectStyle/CoordMode/Visible/DestroyedBy
+    else if(d.stage==="text"){ n.color="#8a3bd0"; n.w=240; n.h=70; n.text="TEXT"; n.fontSize=40; n.textColor="#ffffff"; n.align="center"; n.outline=false; }
     else if(d.stage==="stick"){ n.color="#e0892b"; n.w=200; n.h=200;
       n.style="frame"; n.mode="analog"; n.threshold=0.3; n.limitAxis=false;
       n.keyMode="off"; n.cntlMode="off"; n.hideOnPc=false;
       n.useKey=false; n.visible=true; }
     else if(d.stage==="button"){ n.color="#e0892b"; n.w=150; n.h=150;
-      n.style="frame"; n.output="momentary"; n.cntlBtn="off"; n.keyCode=""; n.hideOnPc=false;
+      n.style="frame"; n.cntlBtn="off"; n.keyCode=""; n.hideOnPc=false;
       n.useKey=false; n.visible=true; }
-    else if(d.stage==="shot"){ n.color="#c084fc"; n.w=70; n.h=70; n.angle=0; n.destroyTag=""; n.bulletSpd=400; n.bulletSize=14; n.bulletColor="#ffe08a"; }
+    else if(d.stage==="shot"){ n.color="#c084fc"; n.w=70; n.h=70; n.angle=0; n.destroyTag=""; n.bulletSpd=400;
+      n.size=28; n.bulletShape="circle"; n.bulletColor="#ffe08a"; n.bulletCount=1; n.bulletInterval=0; }
     else if(d.stage==="rotate"){ n.color="#e0c020"; n.w=70; n.h=70; }
     if(type==="character"){ n.color=randObjColor(); n.flip=true; }
     // レイアウト開始位置（重ならないよう少しずらす）
@@ -258,12 +270,27 @@ function addNode(type, wx, wy){
     n.parentNodeId = null; // 親子構造
   }
   if (d.tex){ n.texW=16; n.texH=16; n.pixels=new Array(16*16).fill(null); n.parentNodeId=null; }
-  if (d.attach){ n.parentNodeId=null; if(type==="contact") n.withTag=""; }
+  if (d.attach){ n.parentNodeId=null;
+    if(type==="contact"){ n.withTag=""; n.contactTarget="all"; n.contactShape="rect"; } // Unity: Target/Shape/Tag
+    if(type==="onbreak"){ n.breakColor="#ffffff"; n.breakEffect="none"; n.breakTag=""; } } // Unity: Color/Effect/Tag
+  // CONTACT/ONBREAK/TEXTURE もレイアウトで配置できるよう位置とサイズを持たせる
+  if (attachesToObject(n)){ n.w=n.w||60; n.h=n.h||60; n.angle=n.angle||0;
+    const oc=nodes.filter(m=>showsInLayout(m)).length;
+    if(n.layoutX==null){ n.layoutX=(oc%5)*100-200; n.layoutY=Math.floor(oc/5)*100-100; } }
+  if (type==="compare"){ n.compareMode="gt"; }                 // 比較演算子（既定：＞）
+  if (type==="random"){ n.rndNum=6; n.useSeed=false; n.seed=0; } // 0〜(Number-1)のInt乱数
+  if (type==="trigger"){ n.triggerDelay=0; }                   // 遅延フレーム（Property）
+  if (type==="counter"){ n.cntType="none"; n.cntMin=0; n.cntMax=100; } // 種別・範囲
+  if (type==="int"){ n.intType="floor"; }                      // 丸め種別
+  if (type==="var"){ n.varInit=0; }                            // 初期値（Play開始時にstoreへ）
+  if (type==="array"){ n.arrInit=""; }                         // 初期値（, / 区切り）
+  if (type==="getpos"||type==="getrot"){ n.getCoord="world"; } // WORLD/LOCAL
   if (type==="keyboard"){ n.keyCode=" "; }                     // 既定：スペース
-  if (type==="sound"){ n.pitch=440; n.wave="square"; }         // 音の高さ・波形
+  if (type==="sound"){ n.tone=0; n.wave="square"; n.volume=10; } // 音番号(0=ド)・波形・音量
   if (type==="velocity"){ n.frames=5; }                        // 速度の平滑化フレーム数
   if (type==="bg"){ n.color="#0a0b10"; }                       // 背景色
-  if (type==="setting"){ n.gravity=2200; n.orient="yoko"; n.fps=60; } // 重力・画面向き・FPS
+  if (type==="setting"){ n.gravity=1; n.orient="yoko"; n.fps=60; n.dynamics=true; // Gravityは倍率(既定1=内部2000)
+    n.setFriction=0.4; n.setBounce=0.0; n.setDrag=0.0; n.stopBtnColor="#ffffff"; } // 全オブジェクト共通の物理パラメータ＋StopBtn色
   nodes.push(n);
   return n;
 }
@@ -278,10 +305,11 @@ function portPos(n, isInput, idx){
   const d = NODE_TYPES[n.type];
   const cnt = (isInput ? d.inputs.length : d.outputs.length);
   const top = n.y - NS/2;
-  // 辺上に配置。複数端子は上下に大きく離す（0.14〜0.86の範囲に展開）
+  // 辺上に配置。3個はギリ重ならない間隔(>直径40)、4個以上は少し重なってOK
   let py;
   if(cnt<=1) py = top + NS/2;
-  else py = top + NS*0.24 + idx*(NS*0.52/(cnt-1));
+  else { const gap = (cnt===2) ? NS*0.52 : (cnt===3 ? 44 : 36);
+    const span=(cnt-1)*gap; py = top + NS/2 - span/2 + idx*gap; }
   const px = isInput ? (n.x - NS/2) : (n.x + NS/2);
   return w2s(px, py);
 }
@@ -289,7 +317,13 @@ function portPos(n, isInput, idx){
 // ---- 接続 ----
 function connect(aId, aOut, bId, bIn){
   if (aId===bId) return;
-  conns = conns.filter(c=>!(c.b===bId && c.bi===bIn)); // 入力は1本まで
+  const bNode=nodeById(bId);
+  const multi = bNode && bNode.type==="add"; // ＋ノードの入力は多重接続で合算（Unity Plus準拠）
+  if(multi){
+    if(conns.some(c=>c.a===aId&&c.ao===aOut&&c.b===bId&&c.bi===bIn)) return; // 同一接続の重複防止
+  } else {
+    conns = conns.filter(c=>!(c.b===bId && c.bi===bIn)); // 入力は1本まで
+  }
   conns.push({ a:aId, ao:aOut, b:bId, bi:bIn });
 }
 function disconnectInput(bId, bIn){ conns = conns.filter(c=>!(c.b===bId && c.bi===bIn)); }
@@ -338,7 +372,8 @@ function outputValue(node, port, seen){
   seen = seen || new Set();
   if (seen.has(node.id)) return 0;     // 循環ガード
   seen.add(node.id);
-  const a=()=>inputValue(node,0,seen), b=()=>inputValue(node,1,seen);
+  // 各入力は独立したパスとして評価（同じソースを両入力に繋いでも循環ガードで0にならないように）
+  const a=()=>inputValue(node,0,new Set(seen)), b=()=>inputValue(node,1,new Set(seen));
   switch(node.type){
     case "const":   return node.value||0;
     case "key":     return port===0 ? axisX : axisY;
@@ -352,41 +387,51 @@ function outputValue(node, port, seen){
         x = x>th?1:(x<-th?-1:0); y = y>th?1:(y<-th?-1:0); }
       return port===0 ? x : y;
     }
-    case "button": {
+    case "button": { // Momentaryのみ：押している間だけ1（Pulse相当はTriggerノードで）
       const bk=node.keyCode||(node.useKey?" ":"");
       const phys = (node.pressed?1:0) || (bk && heldKeys.has(bk) ? 1:0);
-      if(node.output==="toggle") return node.toggleState?1:0;
-      if(node.output==="pulse")  return node.pulseOut?1:0;
       return phys?1:0;
     }
     case "keyboard": return heldKeys.has((node.keyCode||" ")) ? 1 : 0;
     case "touch":    return port===0 ? touchX : (port===1 ? touchY : touchDown);
     // 計算系（青）
-    case "add":     return a()+b();
+    case "add":     { let s=0; for(const c of conns){ if(c.b===node.id&&c.bi===0){ const src=nodeById(c.a); if(src) s+=outputValue(src,c.ao,new Set(seen)); } } return s; } // 多重接続を合算
     case "sub":     return a()-b();
     case "mul":     return a()*b();
     case "div":     { const d=b(); return d!==0 ? a()/d : 0; }
     case "root":    { const v=a(); return v>0 ? Math.sqrt(v) : 0; }
-    case "compare": return a()>b() ? 1 : 0;
+    case "compare": { const av=a(), bv=b(); switch(node.compareMode||"gt"){
+      case "eq": return av===bv?1:0; case "lt": return av<bv?1:0;
+      case "ne": return av!==bv?1:0; case "ge": return av>=bv?1:0; case "le": return av<=bv?1:0;
+      default: return av>bv?1:0; } }
     case "not":     return a()===0 ? 1 : 0;
-    case "arctan":  return Math.atan2(a(), b())*180/Math.PI;
+    case "arctan":  return Math.atan2(b(), a())*180/Math.PI; // 上=X(a), 下=Y(b) → atan2(Y,X)
     case "angletopos": { const r=a()*Math.PI/180; return port===0 ? Math.cos(r) : Math.sin(r); }
     case "random":  return node.rnd||0;
-    case "int":     return Math.floor(a());
+    case "int":     { const v=a(); switch(node.intType||"floor"){ case "round": return Math.round(v);
+      case "ceil": return Math.ceil(v); case "trunc": return Math.trunc(v); default: return Math.floor(v); } }
     // 応用計算系（水色）
     case "trigger": return node.pulse||0;
     case "counter": return node.cnt||0;
     case "var":     return node.store||0;
-    case "array":   { const arr=node.arr||[]; return arr[Math.floor(a())]||0; }
-    case "getpos":  { const t=nodeById(node.target); if(!t) return 0; return port===0 ? (t.playX||0) : (t.playY||0); }
-    case "getrot":  { const t=nodeById(node.target); return t ? (t.playAngle!=null?t.playAngle:(t.angle||0)) : 0; }
+    case "array":   { const arr=node.arr||[]; return arr[Math.floor(b())]||0; } // 入力1=インデックス
+    case "getpos":  { const t=nodeById(node.parentNodeId); if(!t) return 0; // 親に指定したオブジェクト
+      if((node.getCoord||"world")==="local" && t.parentNodeId){ return port===0?(t.lx||0):(t.ly||0); } // Local=親相対
+      return port===0 ? (t.playX||0) : (t.playY||0); }
+    case "getrot":  { const t=nodeById(node.parentNodeId); if(!t) return 0;
+      if((node.getCoord||"world")==="local" && t.parentNodeId){ return t.la||0; }
+      return t.playAngle!=null?t.playAngle:(t.angle||0); }
     // その他（黄）
     case "velocity":{ return port===0 ? (node._ovx||0) : (node._ovy||0); }
     case "contact": { const p=nodeById(node.parentNodeId); if(!p||destroyed.has(p.id)) return 0;
-      for(const o of nodes){ if(o.id===p.id||destroyed.has(o.id)) continue; if(!NODE_TYPES[o.type].object) continue;
-        if(node.withTag && (o.tag||"")!==node.withTag) continue;
+      const tgt=node.contactTarget||"all";
+      for(const o of nodes){ if(o.id===p.id||destroyed.has(o.id)) continue;
+        if(tgt==="tag"){ if(!NODE_TYPES[o.type].object) continue; if((o.tag||"")!==(node.withTag||"")) continue; }
+        else if(tgt==="all"){ if(!NODE_TYPES[o.type].object) continue; }
+        else { if(o.type!==tgt) continue; } // rect/circle/character/shot
         if(overlapAABB(p,o)) return 1; } return 0; }
     case "onbreak": return node.pulseBrk||0;
+    case "screen":  return port===0 ? W : H; // 出力0=画面幅, 出力1=画面高さ
   }
   return 0;
 }
@@ -400,15 +445,15 @@ function startPlay(){
       n.playAngle=n.angle||0; n._lastX=n.playX; n._lastY=n.playY; n._vx=0; n._vy=0; n._rawvx=0; n._rawvy=0; n._face=1; }
     if(n.type==="velocity"){ n._ovx=0; n._ovy=0; }
     if(n.type==="stick"){ n.stickX=0; n.stickY=0; n.stickPid=null; }
-    if(n.type==="button"){ n.pressed=0; n.btnPid=null; n.toggleState=false; n.pulseOut=0; n._prev=0; }
-    if(n.type==="shot"){ n._prevFire=0; }
-    if(n.type==="sound"){ n._prevPlay=0; }
+    if(n.type==="button"){ n.pressed=0; n.btnPid=null; }
+    if(n.type==="shot"){ n._prevFire=0; n._shotCd=0; }
+    if(n.type==="sound"){ n._prevPlay=0; stopTone(n); }
     if(n.type==="onbreak"){ n.pulseBrk=0; }
     if(n.type==="counter") n.cnt=0;
-    if(n.type==="var") n.store=0;
-    if(n.type==="array") n.arr=[];
+    if(n.type==="var") n.store=(n.varInit||0);                 // 初期値を反映
+    if(n.type==="array") n.arr=parseArrInit(n.arrInit);        // 初期値（, / 区切り）を反映
     if(n.type==="trigger"){ n._prevSig=0; n._delay=-1; n.pulse=0; }
-    if(n.type==="random") n.rnd=0;
+    if(n.type==="random"){ n.rnd=null; n._prevT=0; n._rngState = n.useSeed ? ((n.seed||0)>>>0) : null; }
   });
   bullets=[]; playCam={x:0,y:0}; destroyed=new Set(); brokenThisFrame=new Set();
   touchX=0; touchY=0; touchDown=0;
@@ -418,16 +463,20 @@ function startPlay(){
   document.getElementById("pad").style.display="none"; // D-PADは表示しない（STICK/BUTTONノードで操作）
   const ph=document.getElementById("hint"); ph.textContent="矢印 / WASD で移動"; ph.classList.remove("hidden");
   document.getElementById("menuBtn").style.display="none"; // Play中はMENU非表示
-  const b=document.getElementById("playBtn"); b.textContent="■"; b.style.background="#a12b2b";
+  // ストップボタン＝角丸正方形の枠だけ（枠色はSettingのStopBtnCol、既定は白）
+  const sN=nodes.find(n=>n.type==="setting"); const stopCol=(sN&&sN.stopBtnColor)||"#ffffff";
+  const b=document.getElementById("playBtn"); b.textContent=""; b.classList.add("stop"); b.style.background="";
+  const sq=document.createElement("div"); sq.className="stopsq"; sq.style.borderColor=stopCol; b.appendChild(sq);
 }
 function stopPlay(){
   mode=editModeMemory; axisX=axisY=0; keys={};
+  for(const n of nodes){ if(n.type==="sound") stopTone(n); } // 再生中の音を止める
   document.getElementById("pad").style.display="none";
   document.getElementById("menuBtn").style.display="flex";
   const h=document.getElementById("hint");
   if(mode==="layout"){ h.textContent="オブジェクトをドラッグして配置"; h.classList.remove("hidden"); }
   else h.classList.add("hidden");
-  const b=document.getElementById("playBtn"); b.textContent="▶"; updatePlayBtnColor();
+  const b=document.getElementById("playBtn"); b.classList.remove("stop"); b.innerHTML=""; b.textContent="▶"; updatePlayBtnColor();
 }
 // ▶ボタンの背景：Editor=緑 / Layout=水色（テーマカラー）
 function updatePlayBtnColor(){
@@ -437,39 +486,59 @@ function updatePlayBtnColor(){
 function setMode(m){ // edit ⇄ layout 切り替え
   if(mode==="play") return;
   mode=m; editModeMemory=m;
-  selected=null; multiSel.clear(); propNode=null; hideCreateMenu(); refreshProp();
+  // 選択状態はEditor/Layoutで同期。ただしLayoutは配置可能なStageノードのみ選択可
+  if(m==="layout"){
+    if(selected!=null){ const sn=nodeById(selected); if(!sn||!showsInLayout(sn)) selected=null; }
+    [...multiSel].forEach(id=>{ const mn=nodeById(id); if(!mn||!showsInLayout(mn)) multiSel.delete(id); });
+  }
+  propNode=null; hideCreateMenu(); refreshProp();
   document.getElementById("hint").textContent = (m==="layout") ? "オブジェクトをドラッグして配置" : "矢印 / WASD で移動";
   document.getElementById("hint").classList.toggle("hidden", m!=="layout");
   updatePlayBtnColor();
 }
 
 let lastT=0;
-const GRAV=2200, JUMP=880; // 重力(px/s^2) と ジャンプ初速(px/s)
+const GRAV_SCALE=2000, JUMP=880; // Gravityは倍率(表示1)×2000で内部px/s^2、ジャンプ初速(px/s)
 function objHalf(n){ return { hw:(n.w||80)/2, hh:(n.h||80)/2 }; }
 function overlapAABB(a,b){ const A=objHalf(a),B=objHalf(b);
   return Math.abs(a.playX-b.playX) < A.hw+B.hw && Math.abs(a.playY-b.playY) < A.hh+B.hh; }
+// ARRAYの初期値文字列を配列へ（ , か | で区切る。空白・改行も許容）
+function parseArrInit(s){ if(!s) return [];
+  return String(s).split(/[,|\s]+/).filter(x=>x!=="").map(x=>{ const v=parseFloat(x); return isNaN(v)?0:v; }); }
+// 乱数：Use Seed時はノードごとに決定的な系列(mulberry32)、それ以外はMath.random
+function randUnit(n){
+  if(n.useSeed){ let a=(n._rngState==null?((n.seed||0)>>>0):n._rngState);
+    a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t;
+    n._rngState=a>>>0; return ((t^t>>>14)>>>0)/4294967296; }
+  return Math.random();
+}
 // 状態を持つノード（応用計算系）の毎フレーム更新
 function updateStatefulNodes(){
   for(const n of nodes){
     switch(n.type){
-      case "random": n.rnd = Math.random()*2-1; break;
-      case "button": {
-        const bk=n.keyCode||(n.useKey?" ":"");
-        const phys = (n.pressed?1:0) || (bk && heldKeys.has(bk) ? 1:0);
-        if(n.output==="toggle"){ if(!n._prev && phys) n.toggleState=!n.toggleState; }
-        else if(n.output==="pulse"){ n.pulseOut = (!n._prev && phys)?1:0; }
-        n._prev=phys; break; }
-      case "counter": { if(inputValue(n,1)!==0) n.cnt=0; else n.cnt=(n.cnt||0)+inputValue(n,0); break; }
-      case "var": { if(inputValue(n,1)!==0) n.store=inputValue(n,0); break; }
+      case "random": { const num=Math.max(1,Math.round(n.rndNum||1));
+        const gen=()=> Math.floor(randUnit(n)*num); // 0〜(Number-1)のInt
+        // 入力に0以外が入っている間は毎フレーム生成（1秒間にFPS回）。未接続なら常に生成
+        if(conns.some(c=>c.b===n.id&&c.bi===0)){ if(inputValue(n,0)!==0) n.rnd=gen(); if(n.rnd==null) n.rnd=gen(); }
+        else { n.rnd=gen(); }
+        break; }
+      case "counter": { n.cnt=(n.cnt||0)+inputValue(n,0); // 入力0=カウント量
+        const hasMin=n.cntMin!=null, hasMax=n.cntMax!=null;
+        if(n.cntType==="loop" && hasMin && hasMax){ const span=n.cntMax-n.cntMin;
+          if(span>0){ n.cnt=n.cntMin + ((n.cnt-n.cntMin)%span+span)%span; } }
+        else if(n.cntType==="clamp"){ if(hasMax&&n.cnt>n.cntMax) n.cnt=n.cntMax; if(hasMin&&n.cnt<n.cntMin) n.cnt=n.cntMin; }
+        break; }
+      case "var": { if(inputValue(n,1)!==0) n.store=inputValue(n,0); break; } // 入力0=値, 入力1=セット
       case "trigger": {
-        const sig=inputValue(n,0); const F=Math.max(0,Math.round(inputValue(n,1)));
+        const sig=inputValue(n,0); const F=Math.max(0,Math.round(n.triggerDelay||0)); // 遅延はProperty
         if((n._prevSig||0)===0 && sig!==0) n._delay=F; // 立ち上がりで予約
         n._prevSig=sig; n.pulse=0;
         if(n._delay!=null && n._delay>=0){ if(n._delay===0){ n.pulse=1; n._delay=-1; } else n._delay--; }
         break; }
       case "array": {
         if(!n.arr) n.arr=[];
-        if(inputValue(n,2)!==0){ const i=Math.floor(inputValue(n,0)); if(i>=0&&i<100000) n.arr[i]=inputValue(n,1); }
+        // 入力0=値, 入力1=インデックス, 入力2=セット
+        if(inputValue(n,2)!==0){ const i=Math.floor(inputValue(n,1)); if(i>=0&&i<100000) n.arr[i]=inputValue(n,0); }
         break; }
     }
   }
@@ -480,30 +549,47 @@ function playStep(dt){
   axisY = (keys.D||pad.D?1:0) - (keys.U||pad.U?1:0);
   updateStatefulNodes();
   const settingNode = nodes.find(n=>n.type==="setting");
-  const G = settingNode ? (settingNode.gravity||GRAV) : GRAV;   // SETTINGで重力変更
+  // SETTINGで重力変更。Dynamics=OFFで物理（重力）を無効化
+  // Gravityは倍率（既定1）。内部で×2000 = px/s^2。Dynamics=OFFで0
+  const gScale = settingNode ? (settingNode.gravity!=null?settingNode.gravity:1) : 1;
+  const G = (settingNode && settingNode.dynamics===false) ? 0 : gScale*GRAV_SCALE;
+  // 全オブジェクト共通の物理パラメータ（Settingから）
+  const S_FRIC = settingNode && settingNode.setFriction!=null ? settingNode.setFriction : 0.4;
+  const S_BOUNCE = settingNode && settingNode.setBounce!=null ? settingNode.setBounce : 0.0;
+  const S_DRAG = settingNode && settingNode.setDrag!=null ? settingNode.setDrag : 0.0;
   const objs = nodes.filter(n=>NODE_TYPES[n.type].object);
 
   // ROTATE：角速度で自身のplayAngleを回す（子が追従する）
   for(const n of nodes){ if(n.type==="rotate") n.playAngle=(n.playAngle||0)+inputValue(n,0)*dt; }
-  // SOUND：play入力の立ち上がりでビープ
-  for(const n of nodes){ if(n.type==="sound"){ const s=inputValue(n,0);
-    if(!n._prevPlay && s) beep(n.pitch||440, n.wave||"square"); n._prevPlay=s; } }
+  // SOUND：入力1=Signal(S)がある間ずっと鳴る。入力0=Tone(T,接続時は上書き)で音程
+  for(const n of nodes){ if(n.type!=="sound") continue;
+    const s=inputValue(n,1);
+    const tone = conns.some(c=>c.b===n.id&&c.bi===0) ? inputValue(n,0) : (n.tone||0);
+    if(s!==0) startOrUpdateTone(n, toneToFreq(tone), (n.volume!=null?n.volume:10), n.wave||"square");
+    else stopTone(n);
+  }
 
   const live = objs.filter(n=>!destroyed.has(n.id));
   // 1) 重力なし（＝足場/静的コライダ）を先に更新
   const statics = live.filter(n=>!n.dyn);
   for(const n of statics){
-    n.playX += inputValue(n,0)*dt;   // 速度入力があれば動く足場になる（無ければ静止）
-    n.playY += inputValue(n,1)*dt;
+    const k = n.type==="character"?100:1; // CHARACTERのX,Y入力は内部で100倍
+    n.playX += inputValue(n,0)*k*dt;   // 速度入力があれば動く足場になる（無ければ静止）
+    n.playY += inputValue(n,1)*k*dt;
   }
 
   // 2) 重力あり（プレイヤー等）を更新し、静的コライダと衝突解決
   for(const n of live){
     if(!n.dyn) continue;
-    const { hw, hh } = objHalf(n); const bounce=n.bounce||0, fric=n.friction||0;
-    n.vx = inputValue(n,0);
-    const vyIn = inputValue(n,1);
-    if(vyIn < -1 && n.grounded){ n.vy = -JUMP; n.grounded=false; } // 上入力でジャンプ
+    const { hw, hh } = objHalf(n); const bounce=S_BOUNCE, fric=S_FRIC;
+    const kc = n.type==="character"?100:1; // CHARACTERのX,Y入力は内部で100倍（Jumpは対象外）
+    n.vx = inputValue(n,0)*kc;
+    const vyIn = inputValue(n,1)*kc;
+    // ジャンプ：CHARACTERは入力2(J)の立ち上がり、それ以外は上入力(Y<-1)
+    let jump;
+    if(n.type==="character"){ const j=inputValue(n,2); jump=(!n._prevJ && j!==0); n._prevJ=j; }
+    else jump=(vyIn < -1);
+    if(jump && n.grounded){ n.vy = -JUMP; n.grounded=false; }
 
     // 横移動 → 足場で左右をブロック
     n.playX += n.vx*dt;
@@ -513,6 +599,7 @@ function playStep(dt){
 
     // 縦移動（重力）→ 足場に着地／頭ぶつけ（反発・摩擦）
     n.vy = (n.vy||0) + G*dt;
+    if(S_DRAG>0) n.vy *= (1-Math.min(1,S_DRAG*dt*10)); // 空気抵抗（線形ダンピング）
     n.playY += n.vy*dt;
     n.grounded=false;
     for(const s of statics){ if(overlapAABB(n,s)){ const S=objHalf(s);
@@ -529,24 +616,38 @@ function playStep(dt){
   // 3) 親子構造：子は親の移動に追従（親→子の順で解決）
   applyHierarchy();
 
-  // 4) SHOT：fire入力の立ち上がりで弾を発射（角度方向へ）
+  // 4) SHOT：fire入力で弾を1発ずつ発射。BulletCount=画面内に同時に存在できる弾の最大数、Interval=連射間隔フレーム
   for(const n of nodes){ if(n.type!=="shot"||destroyed.has(n.id)) continue;
-    const fire=inputValue(n,0); const spd=conns.some(c=>c.b===n.id&&c.bi===1)?inputValue(n,1):(n.bulletSpd||400);
-    if(!n._prevFire && fire){ const a=((n.playAngle!=null?n.playAngle:n.angle)-90)*Math.PI/180;
-      bullets.push({ x:n.playX, y:n.playY, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, life:3,
-        tag:n.destroyTag||"", size:n.bulletSize||14, color:n.bulletColor||"#ffe08a" }); }
+    const fire=inputValue(n,0); const spd=(n.bulletSpd||400);
+    const interval=Math.max(0,Math.round(n.bulletInterval||0));
+    const maxCnt=Math.max(1,Math.round(n.bulletCount||1));
+    if(n._shotCd>0) n._shotCd--;
+    const alive=bullets.reduce((c,b)=>c+(b.shotId===n.id?1:0),0); // このShotの現存弾数
+    // Interval=0 は立ち上がりのみ発射、Interval>0 は押している間クールダウンごとに連射。最大数未満のときだけ発射
+    const canFire = fire && alive<maxCnt && ( (interval===0 && !n._prevFire) || (interval>0 && (n._shotCd||0)<=0) );
+    if(canFire){
+      const a=((n.playAngle!=null?n.playAngle:n.angle)-90)*Math.PI/180;
+      bullets.push({ x:n.playX, y:n.playY, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, shotId:n.id,
+        tag:n.destroyTag||"", size:n.size||28, shape:n.bulletShape||"circle", color:n.bulletColor||"#ffe08a" });
+      if(interval>0) n._shotCd=interval;
+    }
     n._prevFire=fire;
   }
   brokenThisFrame=new Set();
+  const cx0=playCam.x, cy0=playCam.y;
   for(let i=bullets.length-1;i>=0;i--){ const b=bullets[i];
-    b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
+    b.x+=b.vx*dt; b.y+=b.vy*dt;
     let hitObj=false;
-    if(b.tag){ // タグ一致オブジェクトを破壊
-      for(const o of live){ if(destroyed.has(o.id)) continue; if((o.tag||"")!==b.tag) continue;
+    if(b.tag){ // タグ一致 or DestroyedBy一致のオブジェクトを破壊
+      for(const o of live){ if(destroyed.has(o.id)) continue;
+        if((o.tag||"")!==b.tag && (o.destroyedBy||"")!==b.tag) continue;
         if(Math.abs(b.x-o.playX)<objHalf(o).hw && Math.abs(b.y-o.playY)<objHalf(o).hh){
           destroyed.add(o.id); brokenThisFrame.add(o.id); hitObj=true; break; } }
     }
-    if(hitObj || b.life<=0 || Math.abs(b.x)>W || Math.abs(b.y)>H) bullets.splice(i,1);
+    // 画面外に出たら消滅（カメラ考慮）
+    const sx=W/2+b.x+cx0, sy=H/2+b.y+cy0, m=(b.size||28);
+    const off = sx< -m || sx> W+m || sy< -m || sy> H+m;
+    if(hitObj || off) bullets.splice(i,1);
   }
   // ONBREAK：親が今フレーム破壊されたらパルス
   for(const n of nodes){ if(n.type==="onbreak") n.pulseBrk = brokenThisFrame.has(n.parentNodeId)?1:0; }
@@ -558,20 +659,41 @@ function playStep(dt){
     const f=Math.max(1,n.frames||5); n._ovx=(n._ovx||0)+((t._rawvx||0)-(n._ovx||0))/f; n._ovy=(n._ovy||0)+((t._rawvy||0)-(n._ovy||0))/f; }
 
   // 6) SCREEN：対象を画面中央に追従するカメラ
-  const scr = nodes.find(n=>n.type==="screen" && nodeById(n.target));
-  if(scr){ const t=nodeById(scr.target); playCam.x=-(t.playX||0); playCam.y=-(t.playY||0); }
-  else { playCam.x=0; playCam.y=0; }
+  const scrN = nodes.find(n=>n.type==="screen");
+  if(scrN && (conns.some(c=>c.b===scrN.id&&c.bi===0)||conns.some(c=>c.b===scrN.id&&c.bi===1))){
+    // 入力X,Y でカメラを手動制御（入力2=Scaleは今後用に保持）
+    playCam.x=-inputValue(scrN,0); playCam.y=-inputValue(scrN,1);
+  } else {
+    const scr = nodes.find(n=>n.type==="screen" && nodeById(n.target));
+    if(scr){ const t=nodeById(scr.target); playCam.x=-(t.playX||0); playCam.y=-(t.playY||0); }
+    else { playCam.x=0; playCam.y=0; }
+  }
 }
 // 簡易ビープ（WebAudio）
 let _audioCtx=null;
-function beep(freq,wave){
+function beep(freq,wave,vol){
   try{ if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)();
     const o=_audioCtx.createOscillator(), g=_audioCtx.createGain();
-    o.frequency.value=freq; o.type=wave||"square"; g.gain.value=0.05;
+    o.frequency.value=freq; o.type=wave||"square"; g.gain.value=0.05*(vol!=null?vol/10:1);
     o.connect(g); g.connect(_audioCtx.destination); o.start();
     g.gain.exponentialRampToValueAtTime(0.0001, _audioCtx.currentTime+0.15); o.stop(_audioCtx.currentTime+0.16);
   }catch(e){}
 }
+// Tone(音番号)→周波数。0=ド(C4), 1=レ, 2=ミ …（Cメジャースケール, ドレミファソラシド）
+const MAJOR_STEPS=[0,2,4,5,7,9,11];
+function toneToFreq(t){ const i=Math.round(t); const oct=Math.floor(i/7), deg=((i%7)+7)%7;
+  return 261.63*Math.pow(2, (MAJOR_STEPS[deg]+12*oct)/12); }
+// Signalがある間 継続再生するオシレータ（ノードごと）
+function startOrUpdateTone(n,freq,vol,wave){
+  try{ if(!_audioCtx){ _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(_audioCtx.state==="suspended") _audioCtx.resume();
+    if(!n._osc){ const o=_audioCtx.createOscillator(), g=_audioCtx.createGain();
+      o.type=wave; o.frequency.value=freq; g.gain.value=0.06*(vol/10);
+      o.connect(g); g.connect(_audioCtx.destination); o.start(); n._osc=o; n._gain=g; }
+    else { n._osc.frequency.value=freq; n._osc.type=wave; n._gain.gain.value=0.06*(vol/10); }
+  }catch(e){}
+}
+function stopTone(n){ if(n&&n._osc){ try{ n._osc.stop(); }catch(e){} try{ n._osc.disconnect(); n._gain.disconnect(); }catch(e){} n._osc=null; n._gain=null; } }
 function stageDepth(n){ let d=0,cur=n,g=0; while(cur.parentNodeId){ const p=nodeById(cur.parentNodeId); if(!p||g++>50)break; d++; cur=p; } return d; }
 // 子の「親ローカル座標（位置lx,ly・角度la）」を現在のレイアウトから計算・保持
 function recomputeLocal(c){ const p=nodeById(c.parentNodeId); if(!p) return;
@@ -605,27 +727,34 @@ function applyHierarchy(){
 // =====================================================================
 function draw(){
   ctx.clearRect(0,0,W,H);
-  if(mode==="edit"){ drawGrid(); drawWires(); drawParentWires(); nodes.forEach(drawNode); drawDragWire(); drawSelBox(); }
+  if(mode==="edit"){ drawGrid(); drawWires(); drawParentWires(); nodes.forEach(drawNode); drawDragWire(); drawSelBox(); drawPortCursor(); }
   else if(mode==="layout") drawLayout();
   else if(mode==="texedit") drawTexEditor();
   else drawPlay();
 }
 
 // ---- 親子接続（ノード上端＝子側 / 下端＝親側）----
-const PARENT_COL="#7fe0a0";
-function canHaveParent(n){ return isStage(n) || attachesToObject(n); }
+const PARENT_COL="#ff9b30"; // 親子端子：明るいオレンジ
+const IN_COL="#3ba7ff";     // 入力端子：明るい青
+const OUT_COL="#ff5a5a";    // 出力端子：明るい赤
+function readsParentObject(n){ return n.type==="getpos"||n.type==="getrot"; } // 親オブジェクトの座標/回転を取得
+function canHaveParent(n){ return isStage(n) || attachesToObject(n) || readsParentObject(n); }
 function parentPortPos(n){ return w2s(n.x, n.y - NS/2); } // 上：自分の親へつなぐ端子
 function childPortPos(n){  return w2s(n.x, n.y + NS/2); } // 下：子を受け入れる端子
 function isCandidateParent(child,p){
   if(!child||!p||p.id===child.id) return false;
+  if(readsParentObject(child)) return !!NODE_TYPES[p.type].object; // GETPOS/GETROTはオブジェクトへ
   if(attachesToObject(child)) return !!NODE_TYPES[p.type].object; // TEXTURE/CONTACT/ONBREAKはオブジェクトへ
   if(isStage(child)){ if(!isStage(p)) return false;
     let cur=p,g=0; while(cur){ if(cur.id===child.id) return false; cur=nodeById(cur.parentNodeId); if(g++>60)break; } return true; }
   return false;
 }
-function drawWireV(p1,p2,color){ const dy=Math.abs(p2.y-p1.y)*0.5+20;
+function drawWireV(p1,p2,color){
   ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,3*view.s);
-  ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.bezierCurveTo(p1.x,p1.y+dy, p2.x,p2.y-dy, p2.x,p2.y); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(p1.x,p1.y);
+  if(appSettings.wireStyle==="straight"){ ctx.lineTo(p2.x,p2.y); }
+  else { const dy=Math.abs(p2.y-p1.y)*0.5+20; ctx.bezierCurveTo(p1.x,p1.y+dy, p2.x,p2.y-dy, p2.x,p2.y); }
+  ctx.stroke(); }
 function drawParentWires(){
   for(const n of nodes){ if(!n.parentNodeId) continue; const p=nodeById(n.parentNodeId); if(!p) continue;
     drawWireV(childPortPos(p), parentPortPos(n), PARENT_COL); }
@@ -643,10 +772,11 @@ function drawGrid(){
 }
 
 function drawWire(p1,p2,color){
-  const dx=Math.abs(p2.x-p1.x)*0.5+20;
   ctx.strokeStyle=color; ctx.lineWidth=Math.max(2,3*view.s);
   ctx.beginPath(); ctx.moveTo(p1.x,p1.y);
-  ctx.bezierCurveTo(p1.x+dx,p1.y, p2.x-dx,p2.y, p2.x,p2.y); ctx.stroke();
+  if(appSettings.wireStyle==="straight"){ ctx.lineTo(p2.x,p2.y); }
+  else { const dx=Math.abs(p2.x-p1.x)*0.5+20; ctx.bezierCurveTo(p1.x+dx,p1.y, p2.x-dx,p2.y, p2.x,p2.y); }
+  ctx.stroke();
 }
 function drawWires(){
   for(const c of conns){
@@ -660,11 +790,35 @@ function drawSelBox(){
   ctx.fillStyle="rgba(0,180,255,.15)"; ctx.fillRect(x,y,w,h);
   ctx.strokeStyle="#21b3d6"; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
 }
+// 端子ドラッグのarm後カーソル（Unity版のhighlightCircle相当）＝半径大きめのリング
+let portCursor={show:false, x:0, y:0};
+function drawPortCursor(){
+  if(!portCursor.show) return;
+  const r=Math.max(24, (PORT_R*4)*view.s);
+  // ワイヤードラッグ中：接続対象が無い間は赤、対象があれば黄
+  let col="#ffcc00";
+  if(drag && drag.kind==="wire"){
+    const o=drag.origin; const pt=hitPort(portCursor.x, portCursor.y);
+    const valid = pt && ((o.isInput && !pt.isInput) || (!o.isInput && pt.isInput));
+    col = valid ? "#ffcc00" : "#ff5a5a";
+  } else if(drag && drag.kind==="parentwire"){
+    const child=nodeById(drag.node); let ok=false;
+    for(let i=nodes.length-1;i>=0;i--){ const p=nodes[i]; if(!isCandidateParent(child,p)) continue;
+      const bp=childPortPos(p); if(Math.hypot(portCursor.x-bp.x,portCursor.y-bp.y)<PORT_R*view.s+24){ ok=true; break; } }
+    col = ok ? "#ffcc00" : "#ff5a5a";
+  }
+  ctx.beginPath(); ctx.arc(portCursor.x, portCursor.y, r, 0, 7);
+  ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
+}
 function drawDragWire(){
   if(!drag) return;
   if(drag.kind==="wire"){
-    const a=nodeById(drag.node);
-    drawWire(portPos(a,false,drag.port), {x:drag.sx,y:drag.sy}, "#ffcc00");
+    const o=drag.origin; const on=nodeById(o.node); if(on){
+      const op=portPos(on, o.isInput, o.port);
+      // 固定端がOutput→カーソルへ、Input→カーソルから入力へ（向きを合わせる）
+      if(o.isInput) drawWire({x:drag.sx,y:drag.sy}, op, "#ffcc00");
+      else drawWire(op, {x:drag.sx,y:drag.sy}, "#ffcc00");
+    }
   } else if(drag.kind==="parentwire"){
     const c=nodeById(drag.node);
     // カーソル（未来の親の下端）から下向きに出て、子の上端へ上から入る（確定ワイヤーと同じ向き）
@@ -677,8 +831,8 @@ function drawNode(n){
   const tl=w2s(n.x-NS/2, n.y-NS/2);
   const w=NS*view.s, hh=NS*view.s;
   // 端子（丸のみ）を本体より先に描画＝見た目はノードの後ろ（当たり判定は不変）
-  d.inputs.forEach((_,i)=> port(portPos(n,true,i),  "#ffffff"));
-  d.outputs.forEach((_,i)=>port(portPos(n,false,i), "#ffe08a"));
+  d.inputs.forEach((_,i)=> port(portPos(n,true,i),  IN_COL));
+  d.outputs.forEach((_,i)=>port(portPos(n,false,i), OUT_COL));
   // 親子端子：上＝自分の親へつなぐ（子を持てるノード全て）／下＝子を受け入れる
   if(canHaveParent(n)) port(parentPortPos(n), PARENT_COL);
   const parentDrag = drag && drag.kind==="parentwire";
@@ -702,8 +856,9 @@ function drawNode(n){
     ctx.font=`${Math.round(48*view.s)}px sans-serif`; // 端子ラベル3倍（太字にしない）
     ctx.textBaseline="middle";
     const gap=(PORT_R+12)*view.s;
-    d.inputs.forEach((lab,i)=>{ const p=portPos(n,true,i); ctx.textAlign="right"; portLabel(lab, p.x-gap, p.y); });
-    d.outputs.forEach((lab,i)=>{ const p=portPos(n,false,i); ctx.textAlign="left"; portLabel(lab, p.x+gap, p.y); });
+    // Unity準拠：端子が2つ以上ある側のみ1文字説明。ただし単一入力でもVisible(V)は表示（Button等）
+    d.inputs.forEach((lab,i)=>{ if(d.inputs.length>=2 || lab==="V"){ const p=portPos(n,true,i); ctx.textAlign="right"; portLabel(lab, p.x-gap, p.y); } });
+    if(d.outputs.length>=2) d.outputs.forEach((lab,i)=>{ const p=portPos(n,false,i); ctx.textAlign="left"; portLabel(lab, p.x+gap, p.y); });
   }
 }
 function portLabel(txt,x,y){
@@ -743,9 +898,10 @@ function drawObjShape(cx,cy,n,ang){
   const tex=objVisibleTexture(n);
   if(tex){ drawTexInto(tex, w, h, d.object==="circle"); }
   else {
-    ctx.fillStyle=n.color;
-    if(d.object==="circle"){ ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,7); ctx.fill(); }
-    else ctx.fillRect(-w/2,-h/2,w,h);
+    const frame=(n.objStyle==="frame"); // ObjectStyle: Fill / Frame(枠のみ)
+    ctx.fillStyle=n.color; ctx.strokeStyle=n.color; ctx.lineWidth=Math.max(2,Math.min(w,h)*0.06);
+    if(d.object==="circle"){ ctx.beginPath(); ctx.ellipse(0,0,w/2,h/2,0,0,7); frame?ctx.stroke():ctx.fill(); }
+    else { frame?ctx.strokeRect(-w/2,-h/2,w,h):ctx.fillRect(-w/2,-h/2,w,h); }
   }
   ctx.restore();
 }
@@ -769,21 +925,29 @@ function drawStage(cx,cy,n,ang){
   if(d.stage==="text"){
     let txt = n.text||"";
     if(conns.some(c=>c.b===n.id && c.bi===0)) txt = String(Math.round(inputValue(n,0)*100)/100); // val接続時は数値表示
-    ctx.font=`800 ${(n.fontSize||40)}px sans-serif`; ctx.textAlign=n.align||"center"; ctx.textBaseline="middle";
-    const ax = n.align==="left"?-(n.w||240)/2+8 : n.align==="right"?(n.w||240)/2-8 : 0;
-    ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillText(txt, ax+2, 2);
+    // フォントサイズはLayout枠に合わせる：まず枠高いっぱい、長くて幅に入らなければ縮小
+    const padX=10, padY=6; let fs=Math.max(8,(h-padY*2));
+    ctx.textAlign=n.align||"center"; ctx.textBaseline="middle";
+    if(txt){ ctx.font=`800 ${fs}px sans-serif`; const tw=ctx.measureText(txt).width;
+      const maxW=Math.max(1,w-padX*2); if(tw>maxW) fs=Math.max(6, fs*maxW/tw); }
+    ctx.font=`800 ${fs}px sans-serif`;
+    const ax = n.align==="left"?-(w)/2+padX : n.align==="right"?(w)/2-padX : 0;
+    if(n.outline){ ctx.lineWidth=Math.max(2,fs*0.08); ctx.strokeStyle="#000"; ctx.lineJoin="round"; ctx.strokeText(txt, ax, 0); } // アウトライン
+    else { ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillText(txt, ax+2, 2); } // 通常は影
     ctx.fillStyle=n.textColor||"#ffffff"; ctx.fillText(txt, ax, 0);
   } else if(d.stage==="stick"){
-    const R=Math.min(w,h)/2; const col=n.color||"#e0892b"; const fill=(n.style||"frame")==="fill";
-    ctx.beginPath(); ctx.arc(0,0,R,0,7);
-    ctx.globalAlpha=fill?0.55:0.18; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
-    ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
-    const kx=(n.stickX||0)*R*0.55, ky=(n.stickY||0)*R*0.55;
-    ctx.beginPath(); ctx.arc(kx,ky,R*0.4,0,7); ctx.globalAlpha=0.85; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    const R=Math.min(w,h)/2; const col=n.color||"#e0892b"; const style=n.style||"frame";
+    // FRAME/FILL は外側リングを描く。INNER は外側なし（内側の丸だけ）
+    if(style!=="inner"){ ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke(); }
+    // 内側の丸（ノブ）：FILL=塗り / FRAME・INNER=線のみ
+    const kx=(n.stickX||0)*R*0.55, ky=(n.stickY||0)*R*0.55, kr=R*0.4;
+    ctx.beginPath(); ctx.arc(kx,ky,kr,0,7); ctx.strokeStyle=col; ctx.lineWidth=3;
+    if(style==="fill"){ ctx.fillStyle=col; ctx.fill(); } else { ctx.stroke(); }
   } else if(d.stage==="button"){
     const col=n.color||"#e0892b"; const fill=(n.style||"frame")==="fill";
     roundRect(-w/2,-h/2,w,h,14);
-    ctx.globalAlpha = n.pressed ? 0.9 : (fill?0.6:0.32); ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1;
+    // FILL=塗り / FRAME=枠だけ（押下時のみハイライト塗り）
+    if(fill || n.pressed){ ctx.globalAlpha = n.pressed ? 0.9 : 0.6; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1; }
     ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
   } else if(d.stage==="shot"){ // 発射口（三角）
     ctx.fillStyle=n.color; ctx.beginPath(); ctx.moveTo(0,-h/2); ctx.lineTo(w/2,h/2); ctx.lineTo(-w/2,h/2); ctx.closePath(); ctx.fill();
@@ -791,6 +955,11 @@ function drawStage(cx,cy,n,ang){
     if(mode!=="play"){ const R=Math.min(w,h)/2; ctx.strokeStyle=n.color; ctx.lineWidth=3;
       ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-R,0); ctx.lineTo(R,0); ctx.moveTo(0,-R); ctx.lineTo(0,R); ctx.stroke(); }
+  } else if(attachesToObject(n)){ // CONTACT/ONBREAK/TEXTURE：レイアウト用のマーカー（Play中は非表示）
+    if(mode!=="play"){ const R=Math.min(w,h)/2; const col=n.color||d.color;
+      ctx.setLineDash([6,4]); ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle=col; ctx.font=`800 ${Math.round(R*0.7)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(nodeGlyph(n), 0, 0); }
   }
   ctx.restore();
 }
@@ -807,11 +976,11 @@ function drawLayout(){
   // 中央十字ガイド
   ctx.strokeStyle="#2a313d"; ctx.lineWidth=1/S;
   ctx.beginPath(); ctx.moveTo(0,-H/2); ctx.lineTo(0,H/2); ctx.moveTo(-W/2,0); ctx.lineTo(W/2,0); ctx.stroke();
-  // ステージ要素（ステージ座標で描画）
-  for(const n of nodes){ if(!isStage(n)) continue; drawStage(n.layoutX||0, n.layoutY||0, n); }
+  // ステージ要素＋付随ノード（ステージ座標で描画）
+  for(const n of nodes){ if(!showsInLayout(n)) continue; drawStage(n.layoutX||0, n.layoutY||0, n); }
   ctx.restore();
   // 複数選択のアウトライン＆ハンドル（スクリーン空間）
-  for(const n of nodes){ if(!isStage(n)) continue;
+  for(const n of nodes){ if(!showsInLayout(n)) continue;
     if(multiSel.has(n.id) && selected!==n.id){
       const hw=(n.w||80)/2*layoutView.s, hh=(n.h||80)/2*layoutView.s;
       ctx.save(); ctx.translate(objCenter(n).x,objCenter(n).y); ctx.rotate((n.angle||0)*Math.PI/180);
@@ -820,7 +989,7 @@ function drawLayout(){
     if(selected===n.id) drawHandles(n);
   }
   drawSelBox();
-  if(!nodes.some(isStage)){
+  if(!nodes.some(showsInLayout)){
     ctx.fillStyle="#5a6270"; ctx.font="20px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.fillText("画面長押しでノードを選択してください", W/2, H/2-40);
   }
@@ -856,16 +1025,19 @@ function drawPlay(){
   // ステージ要素（SORTLAYER順、破壊済みは非表示、操作UIは画面固定）
   const uiTypes = new Set(["stick","button"]);
   const drawList = nodes.filter(n=>isStage(n) && !destroyed.has(n.id)
-    && !((n.type==="stick"||n.type==="button") && uiCtrlHidden(n)));
+    && n.type!=="shot"                                                  // SHOT本体（発射口）はPlayに出さない
+    && !((n.type==="stick"||n.type==="button") && uiCtrlHidden(n))
+    && !objHidden(n));
   drawList.sort((a,b)=>(a.layer||50)-(b.layer||50));
   for(const n of drawList){
     const fixed = uiTypes.has(n.type);
     const ox = fixed ? 0 : camX, oy = fixed ? 0 : camY;
     drawStage(W/2+n.playX+ox, H/2+n.playY+oy, n, (n.playAngle!=null?n.playAngle:n.angle));
   }
-  // 弾（カメラ追従）
-  for(const b of bullets){ ctx.fillStyle=b.color||"#ffe08a";
-    ctx.beginPath(); ctx.arc(W/2+b.x+camX, H/2+b.y+camY, (b.size||14)/2, 0, 7); ctx.fill(); }
+  // 弾（カメラ追従）。形状はRect/Circle
+  for(const b of bullets){ ctx.fillStyle=b.color||"#ffe08a"; const s=b.size||28, cx=W/2+b.x+camX, cy=H/2+b.y+camY;
+    if(b.shape==="rect"){ ctx.fillRect(cx-s/2, cy-s/2, s, s); }
+    else { ctx.beginPath(); ctx.arc(cx, cy, s/2, 0, 7); ctx.fill(); } }
   // 画面向き警告（SETTINGでYOKO/TATE指定時）
   const setN=nodes.find(n=>n.type==="setting");
   if(setN){ const wantTate=setN.orient==="tate", isLandscape=W>H;
@@ -884,17 +1056,24 @@ let drag=null;       // {kind:'node'|'pan'|'wire', ...}
 let selected=null;
 let multiSel=new Set();   // 矩形選択された複数ノード（Editor）
 let lastBgDown=0, lastBgPos={x:0,y:0};
+let lastNodeTap={id:null,t:0,x:0,y:0}; // ノードのダブルクリック検出
+function isNodeDblTap(id,sx,sy){ const now=performance.now();
+  const dbl=(lastNodeTap.id===id)&&(now-lastNodeTap.t<350)&&Math.hypot(sx-lastNodeTap.x,sy-lastNodeTap.y)<30;
+  lastNodeTap={id,t:now,x:sx,y:sy}; return dbl; }
 let pointerMoved=false;
 
 function hitPort(sx,sy){
   const R = PORT_R*view.s + 18; // 指でも押しやすい判定
+  // 端子が3個以上で重なっていても、カーソルに最も近い端子を選ぶ
+  let best=null, bestD=R;
   for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i]; const d=NODE_TYPES[n.type];
-    for(let j=0;j<d.outputs.length;j++){ const p=portPos(n,false,j);
-      if(Math.hypot(sx-p.x,sy-p.y)<R) return {node:n.id,isInput:false,port:j}; }
-    for(let j=0;j<d.inputs.length;j++){ const p=portPos(n,true,j);
-      if(Math.hypot(sx-p.x,sy-p.y)<R) return {node:n.id,isInput:true,port:j}; }
+    for(let j=0;j<d.outputs.length;j++){ const p=portPos(n,false,j); const dd=Math.hypot(sx-p.x,sy-p.y);
+      if(dd<bestD){ bestD=dd; best={node:n.id,isInput:false,port:j}; } }
+    for(let j=0;j<d.inputs.length;j++){ const p=portPos(n,true,j); const dd=Math.hypot(sx-p.x,sy-p.y);
+      if(dd<bestD){ bestD=dd; best={node:n.id,isInput:true,port:j}; } }
+    if(best) break; // 最前面のノードを優先（このノード内で最近端子を採用）
   }
-  return null;
+  return best;
 }
 function hitNode(sx,sy){
   for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i];
@@ -915,11 +1094,13 @@ function hitParentPort(sx,sy){
 
 let lpTimer=null, lpX=0, lpY=0;
 function cancelLongPress(){ if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; } }
+let portArmTimer=null;
+function cancelPortArm(){ if(portArmTimer){ clearTimeout(portArmTimer); portArmTimer=null; } }
 
 // レイアウト画面：オブジェクトの当たり判定（回転考慮）
 function hitLayoutObject(sx,sy){
   for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i];
-    if(!isStage(n)) continue;
+    if(!showsInLayout(n)) continue;
     const l=objToLocal(n,sx,sy);
     if(Math.abs(l.x)<=(n.w||80)/2 && Math.abs(l.y)<=(n.h||80)/2) return n;
   }
@@ -936,6 +1117,7 @@ function hitHandle(sx,sy){
 }
 function onDown(sx,sy){
   if(mode==="layout"){
+    if(isCreateMenuOpen()){ hideCreateMenu(); drag=null; return; }
     if(isMultiMenuOpen()){ hideMultiMenu(); drag=null; return; }
     const hd=hitHandle(sx,sy);
     if(hd){ recordUndo(); drag={kind:hd.kind, node:selected}; return; }
@@ -949,9 +1131,11 @@ function onDown(sx,sy){
         lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; showMultiMenu(lpX,lpY); }, 450);
         return;
       }
-      recordUndo();
       multiSel.clear();
       selected=n.id;
+      // ダブルクリックでも Property を開く
+      if(isNodeDblTap(n.id,sx,sy)){ cancelLongPress(); drag=null; openProp(n.id); return; }
+      recordUndo();
       const p=screenToStageLayout(sx,sy);
       drag={kind:"layout", node:n.id, dx:(n.layoutX||0)-p.x, dy:(n.layoutY||0)-p.y};
       lpX=sx; lpY=sy; cancelLongPress();
@@ -965,6 +1149,9 @@ function onDown(sx,sy){
       if(isDbl){ multiSel.clear(); cancelLongPress(); drag={kind:"selboxL", x0:sx,y0:sy,x1:sx,y1:sy}; return; }
       multiSel.clear();
       drag={kind:"layoutpan", sx, sy, vx:layoutView.x, vy:layoutView.y}; // 背景ドラッグでビュー移動
+      // 背景長押し → Create New Node メニュー（Layout画面でも有効）
+      lpX=sx; lpY=sy; cancelLongPress();
+      lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; showCreateMenu(lpX,lpY); }, 450);
     }
     return;
   }
@@ -973,13 +1160,18 @@ function onDown(sx,sy){
   if(isCreateMenuOpen()){ hideCreateMenu(); drag=null; return; }
   if(isMultiMenuOpen()){ hideMultiMenu(); drag=null; return; }
   pointerMoved=false;
-  // 上端の親端子からドラッグ → 親子接続
+  // 上端の親端子からドラッグ → 親子接続（こちらも0.5秒armしてから開始）
   const pp=hitParentPort(sx,sy);
-  if(pp){ drag={kind:"parentwire", node:pp.id, sx, sy}; return; }
+  if(pp){ drag={kind:"portpending", parent:pp, downSx:sx, downSy:sy, armed:false, dead:false, panVX:view.x, panVY:view.y, sx, sy};
+    cancelPortArm();
+    portArmTimer=setTimeout(()=>{ portArmTimer=null; if(drag&&drag.kind==="portpending"&&!drag.dead){ drag.armed=true; portCursor={show:true, x:drag.sx, y:drag.sy}; } }, 400);
+    return; }
   const pt=hitPort(sx,sy);
   if(pt){
-    if(pt.isInput){ recordUndo(); disconnectInput(pt.node, pt.port); } // 入力端子タップで切断
-    else { drag={kind:"wire", node:pt.node, port:pt.port, sx, sy}; }
+    // Unity版と同じ：端子に0.5秒触れてからドラッグ開始（それまではパン）。arm後にカーソル丸を表示。
+    drag={kind:"portpending", pt, downSx:sx, downSy:sy, armed:false, dead:false, panVX:view.x, panVY:view.y, sx, sy};
+    cancelPortArm();
+    portArmTimer=setTimeout(()=>{ portArmTimer=null; if(drag&&drag.kind==="portpending"&&!drag.dead){ drag.armed=true; portCursor={show:true, x:drag.sx, y:drag.sy}; } }, 400);
     return;
   }
   const hn=hitNode(sx,sy);
@@ -992,9 +1184,11 @@ function onDown(sx,sy){
       lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; showMultiMenu(lpX,lpY); }, 450);
       return;
     }
-    recordUndo();
     multiSel.clear();
     selected=hn.node;
+    // ダブルクリックでも Property を開く
+    if(isNodeDblTap(hn.node,sx,sy)){ cancelLongPress(); drag=null; openProp(hn.node); return; }
+    recordUndo();
     const n=nodeById(hn.node);
     drag={kind:"node", node:hn.node, dx:n.x-s2w(sx,sy).x, dy:n.y-s2w(sx,sy).y};
     // ノード長押し → Property パネルを開く
@@ -1042,14 +1236,46 @@ function onMove(sx,sy){
     if(n.parentNodeId) recomputeLocal(n);  // 自分の角度が変わったら相対角度を更新
     updateSubtreeWorld(n);                 // 子を親座標系で回転・移動
   } }
-  else if(drag.kind==="wire"){ drag.sx=sx; drag.sy=sy; }
-  else if(drag.kind==="parentwire"){ drag.sx=sx; drag.sy=sy; }
+  else if(drag.kind==="wire"){ drag.sx=sx; drag.sy=sy; portCursor={show:true, x:sx, y:sy}; }
+  else if(drag.kind==="parentwire"){ drag.sx=sx; drag.sy=sy; portCursor={show:true, x:sx, y:sy}; }
+  else if(drag.kind==="portpending"){
+    const dist=Math.hypot(sx-drag.downSx, sy-drag.downSy);
+    if(!drag.armed){
+      if(!drag.dead && dist>25){ drag.dead=true; cancelPortArm(); } // arm前に大きく動いた＝パン扱い
+      if(drag.dead){ view.x=drag.panVX-(sx-drag.downSx)/view.s; view.y=drag.panVY-(sy-drag.downSy)/view.s; } // パン
+    } else {
+      drag.sx=sx; drag.sy=sy; portCursor={show:true, x:sx, y:sy};
+      if(dist>6){ // arm後に動いたらワイヤー編集開始
+        if(drag.parent){ drag={kind:"parentwire", node:drag.parent.id, sx, sy}; portCursor={show:true, x:sx, y:sy}; }
+        else beginWireDrag(drag.pt, sx, sy);
+      }
+    }
+  }
+}
+// portpending から実ワイヤードラッグへ
+//  ・出力端子：常に新規ワイヤー作成（接続済みでもfan-out。既存ワイヤーは残す）
+//  ・入力端子（接続済み）：接続解除（元のOutputを掴んで引き離す。遠くで離すと削除、他入力で付け替え可）
+function beginWireDrag(pt, sx, sy){
+  let origin;
+  if(pt.isInput){
+    const c=conns.find(cc=>cc.b===pt.node&&cc.bi===pt.port);
+    if(c){ recordUndo(); conns=conns.filter(x=>x!==c); origin={node:c.a, port:c.ao, isInput:false}; } // 接続解除へ移行
+    else { origin={node:pt.node, port:pt.port, isInput:true}; } // 空きInputから逆向きに新規
+  } else {
+    origin={node:pt.node, port:pt.port, isInput:false}; // 出力は常に新規ワイヤー
+  }
+  drag={kind:"wire", origin, sx, sy};
+  portCursor={show:true, x:sx, y:sy};
 }
 function onUp(sx,sy){
-  cancelLongPress();
+  cancelLongPress(); cancelPortArm(); portCursor={show:false,x:0,y:0};
   if(drag && drag.kind==="wire"){
-    const pt=hitPort(sx,sy);
-    if(pt && pt.isInput){ recordUndo(); connect(drag.node, drag.port, pt.node, pt.port); }
+    const pt=hitPort(sx,sy); const o=drag.origin;
+    // 端子上で離せば接続（向きが合う場合）。十分離れた場所で離すとワイヤー削除（付け替えは既に外してある）。
+    if(pt){
+      if(o.isInput && !pt.isInput){ recordUndo(); connect(pt.node, pt.port, o.node, o.port); }
+      else if(!o.isInput && pt.isInput){ recordUndo(); connect(o.node, o.port, pt.node, pt.port); }
+    }
   }
   if(drag && drag.kind==="parentwire"){
     recordUndo();
@@ -1072,7 +1298,7 @@ function onUp(sx,sy){
     const x0=Math.min(drag.x0,drag.x1), x1=Math.max(drag.x0,drag.x1);
     const y0=Math.min(drag.y0,drag.y1), y1=Math.max(drag.y0,drag.y1);
     multiSel.clear();
-    for(const n of nodes){ if(!isStage(n)) continue; const c=objCenter(n); if(c.x>=x0&&c.x<=x1&&c.y>=y0&&c.y<=y1) multiSel.add(n.id); }
+    for(const n of nodes){ if(!showsInLayout(n)) continue; const c=objCenter(n); if(c.x>=x0&&c.x<=x1&&c.y>=y0&&c.y<=y1) multiSel.add(n.id); }
   }
   drag=null;
 }
@@ -1084,7 +1310,7 @@ function playDown(pid,sx,sy){
   for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i]; const d=NODE_TYPES[n.type];
     if(!(d.stage==="stick"||d.stage==="button")) continue;
     if(uiCtrlHidden(n)) continue;
-    const l=objToLocal(n,sx,sy); const R=Math.min(n.w||150,n.h||150)/2;
+    const l=playObjToLocal(n,sx,sy); const R=Math.min(n.w||150,n.h||150)/2;
     const hit = (d.stage==="stick") ? (Math.hypot(l.x,l.y)<=R) : (Math.abs(l.x)<=(n.w||150)/2 && Math.abs(l.y)<=(n.h||150)/2);
     if(hit){
       if(d.stage==="stick"){ n.stickPid=pid; updateStick(n,l,R); }
@@ -1096,12 +1322,24 @@ function playDown(pid,sx,sy){
 const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints>0);
 // STICK/BUTTONの表示・当たり判定を隠すか（STYLE=OFF / VISIBLE=false / Hide on PC）
 function uiCtrlHidden(n){ if((n.style||"frame")==="off") return true; if(n.visible===false) return true;
-  if(n.hideOnPc && !IS_TOUCH) return true; return false; }
+  if(n.hideOnPc && !IS_TOUCH) return true;
+  if(conns.some(c=>c.b===n.id&&c.bi===0) && inputValue(n,0)===0) return true; // 入力0=可視性(V)
+  return false; }
+// オブジェクト/テキストの可視性入力（Rect/Circle 入力2, Text 入力1）が0なら非表示。Visibleプロパティも反映
+function objHidden(n){
+  if(NODE_TYPES[n.type].object && n.visible===false) return true; // Visibleプロパティ
+  if(n.type==="rect"||n.type==="circle"){ return conns.some(c=>c.b===n.id&&c.bi===2) && inputValue(n,2)===0; }
+  if(n.type==="text"){ return conns.some(c=>c.b===n.id&&c.bi===1) && inputValue(n,1)===0; }
+  return false; }
 function updateStick(n,l,R){ let x=l.x/R, y=l.y/R; const m=Math.hypot(x,y); if(m>1){ x/=m; y/=m; } n.stickX=x; n.stickY=y; }
+// Play中のローカル座標（画面固定・1:1。レイアウトのズーム/パンに依存しない）
+function playObjToLocal(n,sx,sy){ const a=-((n.playAngle!=null?n.playAngle:(n.angle||0))*Math.PI/180);
+  const dx=sx-(W/2+(n.playX||0)), dy=sy-(H/2+(n.playY||0));
+  return { x:dx*Math.cos(a)-dy*Math.sin(a), y:dx*Math.sin(a)+dy*Math.cos(a) }; }
 function playMove(pid,sx,sy){
   touchX=sx-W/2; touchY=sy-H/2;
   for(const n of nodes){ const d=NODE_TYPES[n.type];
-    if(d.stage==="stick" && n.stickPid===pid){ const R=Math.min(n.w||150,n.h||150)/2; updateStick(n,objToLocal(n,sx,sy),R); }
+    if(d.stage==="stick" && n.stickPid===pid){ const R=Math.min(n.w||150,n.h||150)/2; updateStick(n,playObjToLocal(n,sx,sy),R); }
   }
 }
 function playUp(pid){
@@ -1113,22 +1351,45 @@ function playUp(pid){
 }
 
 // ===== テクスチャエディタ =====
-const TEX_PALETTE=UNITY_PALETTE;   // Unity版パレットを使用
-let texEditNode=null, texColor=UNITY_PALETTE[0], texEraser=false, texPressed=false, texGeom=null;
-(function buildTexPalette(){
-  const cont=document.getElementById("texPalette"); if(!cont) return;
-  TEX_PALETTE.forEach((col,i)=>{ const sw=document.createElement("div"); sw.className="sw"+(i===0?" sel":"");
-    sw.style.background=col; sw.onclick=()=>{ texColor=col; texEraser=false; markTexSel(sw); }; cont.appendChild(sw); });
-  const er=document.createElement("div"); er.className="sw eraser"; er.onclick=()=>{ texEraser=true; markTexSel(er); }; cont.appendChild(er);
-})();
-function markTexSel(el){ document.querySelectorAll("#texPalette .sw").forEach(s=>s.classList.remove("sel")); el.classList.add("sel"); }
+let texEditNode=null, texColor="#ffffff", texMode="draw", texPressed=false, texGeom=null; // texMode: draw / erase / pick
+// 作業用パレット（8色）＋選択インデックス。長押しで通常パレットから色変更可
+let texWork=["#ffffff","#000000","#ff5a5a","#4ade80","#3ba7ff","#ffe08a","#e0892b","#c084fc"];
+let texSel=0;
+function updateTexModeUI(){
+  const d=document.getElementById("texDraw"), e=document.getElementById("texErase"), pk=document.getElementById("texPick");
+  if(d) d.classList.toggle("active", texMode==="draw");
+  if(e) e.classList.toggle("active", texMode==="erase");
+  if(pk) pk.classList.toggle("active", texMode==="pick");
+}
+function buildTexWork(){
+  const cont=document.getElementById("texWork"); if(!cont) return; cont.innerHTML="";
+  texWork.forEach((col,i)=>{
+    const sw=document.createElement("div"); sw.className="tsw"+(i===texSel?" sel":""); sw.style.background=col;
+    let lp=null;
+    sw.addEventListener("pointerdown",ev=>{ ev.stopPropagation();
+      lp=setTimeout(()=>{ lp=null; openColorPicker(texWork[i], c=>{ texWork[i]=c; texSel=i; texColor=c; texMode="draw"; updateTexModeUI(); buildTexWork(); }); }, 500); });
+    sw.addEventListener("pointerup",ev=>{ ev.stopPropagation(); if(lp){ clearTimeout(lp); lp=null; texSel=i; texColor=texWork[i]; if(texMode==="erase")texMode="draw"; updateTexModeUI(); buildTexWork(); } });
+    sw.addEventListener("pointercancel",()=>{ if(lp){clearTimeout(lp);lp=null;} });
+    cont.appendChild(sw);
+  });
+}
+// テクスチャのサイズ変更（画像をなるべく残す＝最近傍リサンプル）
+function resizeTexture(n,newN){ const oldN=n.texW||16; if(newN===oldN) return;
+  const np=new Array(newN*newN).fill(null);
+  for(let y=0;y<newN;y++) for(let x=0;x<newN;x++){ const sx=Math.min(oldN-1,Math.floor(x*oldN/newN)), sy=Math.min(oldN-1,Math.floor(y*oldN/newN));
+    np[y*newN+x]=n.pixels[sy*oldN+sx]; }
+  n.texW=newN; n.texH=newN; n.pixels=np;
+}
 function openTexEditor(id){ texEditNode=id; mode="texedit"; propNode=null; refreshProp();
-  document.getElementById("texBar").style.display="block";
+  buildTexWork(); texColor=texWork[texSel]; texMode="draw"; updateTexModeUI();
+  document.getElementById("texBar").style.display="flex";
+  document.getElementById("texCloseBtn").style.display="block";
   document.getElementById("menuBtn").style.display="none";
   document.getElementById("playBtn").style.display="none";
 }
 function closeTexEditor(){ texEditNode=null; mode="edit";
   document.getElementById("texBar").style.display="none";
+  document.getElementById("texCloseBtn").style.display="none";
   document.getElementById("menuBtn").style.display="flex";
   document.getElementById("playBtn").style.display="flex";
 }
@@ -1136,10 +1397,10 @@ function drawTexEditor(){
   ctx.fillStyle="#0d1017"; ctx.fillRect(0,0,W,H);
   const n=nodeById(texEditNode); if(!n){ texGeom=null; return; }
   const N=n.texW||16;
-  const barH=document.getElementById("texBar").offsetHeight||150;
-  const avail=Math.min(W-40, H-barH-40);
+  const leftPad=104; // 左のツールパネル分をあける
+  const avail=Math.min(W-leftPad-24, H-70);
   const cell=Math.floor(avail/N), size=cell*N;
-  const ox=Math.floor((W-size)/2), oy=Math.floor((H-barH-size)/2)+10;
+  const ox=leftPad + Math.floor((W-leftPad-size)/2), oy=Math.floor((H-size)/2)+8;
   for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const px=ox+x*cell, py=oy+y*cell;
     ctx.fillStyle=((x+y)&1)?"#20242e":"#171a22"; ctx.fillRect(px,py,cell,cell);  // 透明チェッカー
     const col=n.pixels[y*N+x]; if(col){ ctx.fillStyle=col; ctx.fillRect(px,py,cell,cell); } }
@@ -1150,12 +1411,14 @@ function drawTexEditor(){
 }
 function texPaint(sx,sy){ const n=nodeById(texEditNode); if(!n||!texGeom) return;
   const {ox,oy,cell,N}=texGeom; const x=Math.floor((sx-ox)/cell), y=Math.floor((sy-oy)/cell);
-  if(x<0||y<0||x>=N||y>=N) return; n.pixels[y*N+x]= texEraser?null:texColor;
+  if(x<0||y<0||x>=N||y>=N) return;
+  if(texMode==="pick"){ const c=n.pixels[y*N+x]; if(c){ texWork[texSel]=c; texColor=c; buildTexWork(); } return; } // 色をPick
+  n.pixels[y*N+x]= (texMode==="erase") ? null : texColor;
 }
-document.querySelectorAll("#texTools [data-sz]").forEach(b=> b.onclick=()=>{ const n=nodeById(texEditNode); if(!n)return;
-  const N=+b.dataset.sz; n.texW=N; n.texH=N; n.pixels=new Array(N*N).fill(null); });
-document.getElementById("texClear").onclick=()=>{ const n=nodeById(texEditNode); if(n) n.pixels=new Array((n.texW||16)*(n.texH||16)).fill(null); };
-document.getElementById("texClose").onclick=closeTexEditor;
+document.getElementById("texDraw").onclick=()=>{ texMode="draw"; updateTexModeUI(); };
+document.getElementById("texErase").onclick=()=>{ texMode="erase"; updateTexModeUI(); };
+document.getElementById("texPick").onclick=()=>{ texMode="pick"; updateTexModeUI(); };
+document.getElementById("texCloseBtn").onclick=closeTexEditor;
 
 // pointer events（Editor/Layout は2本指ピンチでズーム＆パン）
 const ptrs=new Map(); let pinchPrev=null;
@@ -1165,7 +1428,7 @@ function doPinch(){
   const a=pts[0], b=pts[1];
   const dist=Math.hypot(a.x-b.x,a.y-b.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
   if(pinchPrev){
-    const V=activeView(); const minS=(mode==="layout")?0.15:0.3;
+    const V=activeView(); const minS=(mode==="layout")?0.075:0.15;
     const bx=(mx-W/2)/V.s+V.x, by=(my-H/2)/V.s+V.y;
     V.s=Math.min(3,Math.max(minS, V.s*(dist/pinchPrev.dist)));
     const ax=(mx-W/2)/V.s+V.x, ay=(my-H/2)/V.s+V.y;
@@ -1195,15 +1458,15 @@ cv.addEventListener("pointercancel", e=>{ ptrs.delete(e.pointerId); pinchPrev=nu
   if(mode==="play"){ playUp(e.pointerId); return; } texPressed=false; drag=null; cancelLongPress();});
 // wheel zoom（Editor と Layout）
 cv.addEventListener("wheel", e=>{ e.preventDefault();
-  const f = e.deltaY<0?1.1:0.9;
+  const f = e.deltaY<0?1.2:0.8; // 変化量を倍に（±0.1→±0.2相当）
   if(mode==="edit"){
     const before=s2w(e.clientX,e.clientY);
-    view.s=Math.min(3,Math.max(0.3,view.s*f));
+    view.s=Math.min(3,Math.max(0.15,view.s*f)); // ズームアウト限界を拡大（0.3→0.15）
     const after=s2w(e.clientX,e.clientY);
     view.x+=before.x-after.x; view.y+=before.y-after.y;
   } else if(mode==="layout"){
     const before=screenToStageLayout(e.clientX,e.clientY);
-    layoutView.s=Math.min(3,Math.max(0.15,layoutView.s*f));
+    layoutView.s=Math.min(3,Math.max(0.075,layoutView.s*f));
     const after=screenToStageLayout(e.clientX,e.clientY);
     layoutView.x+=before.x-after.x; layoutView.y+=before.y-after.y;
   }
@@ -1252,20 +1515,26 @@ document.querySelectorAll("#pad .k").forEach(el=>{
 // =====================================================================
 const createMenu=document.getElementById("createMenu");
 (function buildCreateMenu(){
-  const title=document.createElement("div"); title.className="title"; title.textContent="CREATE NEW NODE";
+  const hd=document.createElement("div"); hd.style.cssText="display:flex;align-items:center;margin-bottom:8px";
+  const title=document.createElement("div"); title.className="title"; title.textContent="CREATE NEW NODE"; title.style.padding="2px 4px 0";
+  const cl=document.createElement("button"); cl.className="pclose"; cl.textContent="×"; cl.onclick=(e)=>{ e.stopPropagation(); hideCreateMenu(); };
+  hd.appendChild(title); hd.appendChild(cl);
   const row=document.createElement("div"); row.className="row";
   PALETTE.forEach(t=>{ const d=NODE_TYPES[t];
     const b=document.createElement("div"); b.className="ci";
     b.textContent=d.label; b.style.background=d.color;                 // ボタン背景＝カテゴリ色
     b.onclick=(e)=>{ e.stopPropagation();
-      if(createMenu._w){ recordUndo(); addNode(t, createMenu._w.x, createMenu._w.y); }
+      recordUndo();
+      const w=createMenu._w||s2w(W/2,H/2);
+      const n=addNode(t, w.x, w.y);
+      if(mode==="layout" && isStage(n) && createMenu._sx!=null){ const lp=screenToStageLayout(createMenu._sx, createMenu._sy); n.layoutX=lp.x; n.layoutY=lp.y; }
       hideCreateMenu(); };
     row.appendChild(b);
   });
-  createMenu.appendChild(title); createMenu.appendChild(row);
+  createMenu.appendChild(hd); createMenu.appendChild(row);
 })();
 function showCreateMenu(sx,sy){
-  createMenu._w=s2w(sx,sy);
+  createMenu._w=s2w(sx,sy); createMenu._sx=sx; createMenu._sy=sy;
   createMenu.style.display="block";
   const mw=createMenu.offsetWidth||220, mh=createMenu.offsetHeight||180;
   createMenu.style.left=Math.max(6,Math.min(W-mw-6, sx-mw/2))+"px";
@@ -1346,11 +1615,12 @@ function refreshProp(){
     const inp=document.createElement("input"); inp.type="text"; inp.value=n.text||"";
     inp.oninput=()=>{ n.text=inp.value; };
     r.appendChild(lb); r.appendChild(inp); propPanel.appendChild(r);
-    numRow("Size", ()=>n.fontSize||40, v=>{ n.fontSize=Math.max(8,v); });
     selRow("Align", [{value:"left",label:"Left"},{value:"center",label:"Center"},{value:"right",label:"Right"}], ()=>n.align||"center", v=>{ n.align=v; });
     colRow("Color", OBJ_COLORS, ()=>n.textColor||"#ffffff", v=>{ n.textColor=v; });
+    chkRow("Outline", ()=>n.outline, v=>{ n.outline=v; });
   }
   const STYLE_OPTS=[{value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},{value:"off",label:"OFF"}];
+  const STICK_STYLE_OPTS=[{value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},{value:"inner",label:"INNER"},{value:"off",label:"OFF"}];
   const KEYMODE_OPTS=[{value:"off",label:"Off"},{value:"wasd",label:"WASD"},{value:"ijkl",label:"IJKL"},{value:"cursor",label:"Cursor"},{value:"8462",label:"8462"}];
   const CNTL_OPTS=[{value:"off",label:"Off"},{value:"lstick",label:"L-Stick"},{value:"rstick",label:"R-Stick"},{value:"dpad",label:"DPAD"}];
   const KEY_OPTS=[{value:"",label:"Off"},{value:" ",label:"SPACE"},{value:"enter",label:"ENTER"},
@@ -1359,7 +1629,7 @@ function refreshProp(){
     {value:"i",label:"I"},{value:"j",label:"J"},{value:"k",label:"K"},{value:"l",label:"L"},
     {value:"z",label:"Z"},{value:"x",label:"X"},{value:"c",label:"C"}];
   if(n.type==="stick"){
-    selRow("Style",  STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
+    selRow("Style",  STICK_STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
     colRow("Color",  OBJ_COLORS, ()=>n.color||"#e0892b", v=>{ n.color=v; });
     selRow("Signal", [{value:"analog",label:"Analog"},{value:"digital",label:"Digital"}], ()=>n.mode||"analog", v=>{ n.mode=v; refreshProp(); });
     if(n.mode==="digital"){
@@ -1373,7 +1643,8 @@ function refreshProp(){
   if(n.type==="button"){
     selRow("Style",  STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
     colRow("Color",  OBJ_COLORS, ()=>n.color||"#e0892b", v=>{ n.color=v; });
-    selRow("Output", [{value:"momentary",label:"Momentary"},{value:"toggle",label:"Toggle"},{value:"pulse",label:"Pulse"}], ()=>n.output||"momentary", v=>{ n.output=v; });
+    numRow("Width",  ()=>n.w||150, v=>{ n.w=Math.max(24,v); }); // Unity: RECT WIDTH/HEIGHT
+    numRow("Height", ()=>n.h||150, v=>{ n.h=Math.max(24,v); });
     selRow("Keyboard",   KEY_OPTS,  ()=>n.keyCode||"", v=>{ n.keyCode=v; });
     selRow("Controller", CNTL_OPTS, ()=>n.cntlBtn||"off", v=>{ n.cntlBtn=v; });
     chkRow("Hide on PC", ()=>n.hideOnPc, v=>{ n.hideOnPc=v; });
@@ -1381,22 +1652,72 @@ function refreshProp(){
   if(n.type==="keyboard"){
     selRow("Key", KEY_OPTS.filter(o=>o.value!==""), ()=>n.keyCode||" ", v=>{ n.keyCode=v; });
   }
-  if(n.type==="sound"){ numRow("Pitch", ()=>n.pitch||440, v=>{ n.pitch=Math.max(50,v); });
-    selRow("Wave", [{value:"square",label:"Square"},{value:"sine",label:"Sine"},{value:"triangle",label:"Triangle"},{value:"sawtooth",label:"Saw"}], ()=>n.wave||"square", v=>{ n.wave=v; }); }
+  if(n.type==="compare"){
+    selRow("Operator", [{value:"eq",label:"＝"},{value:"gt",label:"＞"},{value:"lt",label:"＜"},
+      {value:"ne",label:"≠"},{value:"ge",label:"≧"},{value:"le",label:"≦"}],
+      ()=>n.compareMode||"gt", v=>{ n.compareMode=v; });
+  }
+  if(n.type==="random"){
+    numRow("Number", ()=>n.rndNum!=null?n.rndNum:6, v=>{ n.rndNum=Math.max(1,Math.round(v)); }); // 出力=0〜Number-1
+    chkRow("Use Seed", ()=>n.useSeed, v=>{ n.useSeed=v; refreshProp(); });
+    if(n.useSeed) numRow("Seed", ()=>n.seed||0, v=>{ n.seed=Math.round(v); });
+  }
+  if(n.type==="trigger"){
+    numRow("Delay (F)", ()=>n.triggerDelay||0, v=>{ n.triggerDelay=Math.max(0,Math.round(v)); });
+  }
+  if(n.type==="counter"){
+    selRow("Type", [{value:"none",label:"None"},{value:"clamp",label:"Clamp"},{value:"loop",label:"Loop"}],
+      ()=>n.cntType||"none", v=>{ n.cntType=v; refreshProp(); });
+    if(n.cntType==="clamp"||n.cntType==="loop"){
+      numRow("Min", ()=>n.cntMin!=null?n.cntMin:0, v=>{ n.cntMin=v; });
+      numRow("Max", ()=>n.cntMax!=null?n.cntMax:100, v=>{ n.cntMax=v; });
+    }
+  }
+  if(n.type==="int"){
+    selRow("Round", [{value:"floor",label:"Floor"},{value:"round",label:"Round"},{value:"ceil",label:"Ceil"},{value:"trunc",label:"Trunc"}],
+      ()=>n.intType||"floor", v=>{ n.intType=v; });
+  }
+  if(n.type==="var"){ numRow("Init", ()=>n.varInit||0, v=>{ n.varInit=v; }); } // 初期値
+  if(n.type==="array"){ txtRow("Values", ()=>n.arrInit||"", v=>{ n.arrInit=v; }); // 初期値（, か | 区切り）
+    const ex=document.createElement("div"); ex.textContent="ex) 5,-2,0.18|5,-7|-12.6";
+    ex.style.cssText="color:#8a92a6;font-size:12px;margin:-4px 0 8px 2px"; propPanel.appendChild(ex); }
+  if(n.type==="sound"){ numRow("Tone", ()=>n.tone!=null?n.tone:0, v=>{ n.tone=Math.round(v); }); // 0=ド,1=レ,2=ミ…
+    selRow("Wave", [{value:"square",label:"Square"},{value:"sine",label:"Sine"},{value:"triangle",label:"Triangle"},{value:"sawtooth",label:"Saw"}], ()=>n.wave||"square", v=>{ n.wave=v; });
+    numRow("Volume", ()=>n.volume!=null?n.volume:10, v=>{ n.volume=Math.max(0,Math.min(20,v)); }); } // 0〜20, 既定10
   if(n.type==="velocity"){ numRow("Frames", ()=>n.frames||5, v=>{ n.frames=Math.max(1,Math.round(v)); }); }
-  if(n.type==="contact"){ txtRow("With Tag", ()=>n.withTag||"", v=>{ n.withTag=v; }); }
+  if(n.type==="contact"){
+    selRow("Target", [{value:"all",label:"ALL"},{value:"rect",label:"RECT"},{value:"circle",label:"CIRCLE"},{value:"character",label:"CHARA"},{value:"shot",label:"SHOT"},{value:"tag",label:"TAG"}],
+      ()=>n.contactTarget||"all", v=>{ n.contactTarget=v; refreshProp(); });
+    if((n.contactTarget||"all")==="tag") txtRow("Tag", ()=>n.withTag||"", v=>{ n.withTag=v; });
+    selRow("Shape", [{value:"rect",label:"RECT"},{value:"circle",label:"CIRCLE"}], ()=>n.contactShape||"rect", v=>{ n.contactShape=v; });
+  }
+  if(n.type==="onbreak"){
+    colRow("Color", OBJ_COLORS, ()=>n.breakColor||"#ffffff", v=>{ n.breakColor=v; });
+    selRow("Effect", [{value:"none",label:"None"},{value:"particle",label:"Particle"},{value:"line",label:"Line"},{value:"circle",label:"Circle"},{value:"rect",label:"Rect"}], ()=>n.breakEffect||"none", v=>{ n.breakEffect=v; });
+    txtRow("Tag", ()=>n.breakTag||"", v=>{ n.breakTag=v; });
+  }
   if(n.type==="bg"){ colRow("Color", OBJ_COLORS, ()=>n.color||"#0a0b10", v=>{ n.color=v; }); }
-  if(n.type==="setting"){ numRow("Gravity", ()=>n.gravity||2200, v=>{ n.gravity=Math.max(0,v); });
+  if(n.type==="setting"){ numRow("Gravity", ()=>n.gravity!=null?n.gravity:1, v=>{ n.gravity=Math.max(0,v); }); // 倍率（内部で×2000）
+    chkRow("Dynamics", ()=>n.dynamics!==false, v=>{ n.dynamics=v; }); // 物理シミュレーション全体ON/OFF
+    // 全オブジェクト共通の物理パラメータ（Unity版準拠）
+    numRow("Friction %", ()=>Math.round((n.setFriction!=null?n.setFriction:0.4)*100), v=>{ n.setFriction=Math.min(1,Math.max(0,v/100)); });
+    numRow("Bounce %",   ()=>Math.round((n.setBounce!=null?n.setBounce:0)*100), v=>{ n.setBounce=Math.min(1,Math.max(0,v/100)); });
+    numRow("Drag %",     ()=>Math.round((n.setDrag!=null?n.setDrag:0)*100), v=>{ n.setDrag=Math.min(1,Math.max(0,v/100)); });
+    colRow("StopBtnCol", OBJ_COLORS, ()=>n.stopBtnColor||"#ffffff", v=>{ n.stopBtnColor=v; }); // ストップボタンの枠色
     selRow("Screen", [{value:"yoko",label:"Yoko(横)"},{value:"tate",label:"Tate(縦)"}], ()=>n.orient||"yoko", v=>{ n.orient=v; });
     numRow("FPS", ()=>n.fps||60, v=>{ n.fps=Math.max(10,Math.min(120,Math.round(v))); }); }
   if(n.type==="shot"){
     txtRow("Destroy Tag", ()=>n.destroyTag||"", v=>{ n.destroyTag=v; });
+    selRow("Shape", [{value:"circle",label:"Circle"},{value:"rect",label:"Rect"}], ()=>n.bulletShape||"circle", v=>{ n.bulletShape=v; });
+    numRow("Size", ()=>n.size||28, v=>{ n.size=Math.max(2,v); }); // Width/Height/BulletSize統一
     numRow("Bullet Speed", ()=>n.bulletSpd||400, v=>{ n.bulletSpd=v; });
-    numRow("Bullet Size", ()=>n.bulletSize||14, v=>{ n.bulletSize=Math.max(2,v); });
     colRow("Bullet Color", OBJ_COLORS, ()=>n.bulletColor||"#ffe08a", v=>{ n.bulletColor=v; });
+    numRow("Bullet Count", ()=>n.bulletCount||1, v=>{ n.bulletCount=Math.max(1,Math.round(v)); });
+    numRow("Interval (F)", ()=>n.bulletInterval||0, v=>{ n.bulletInterval=Math.max(0,Math.round(v)); });
+    numRow("Angle", ()=>n.angle||0, v=>{ n.angle=v; }); // 発射方向
   }
-  // 幾何プロパティ（STICK/BUTTONは独自UIなので除外）＝ Unity順: W/H → Angle → Color/Flip/Dynamics → Tag → Layer
-  const hasGeom = d.object || d.stage==="text" || d.stage==="shot" || d.stage==="rotate";
+  // 幾何プロパティ（STICK/BUTTON/SHOTは独自UIなので除外）＝ Unity順: W/H → Angle → Color/Flip/Dynamics → Tag → Layer
+  const hasGeom = d.object || d.stage==="text" || d.stage==="rotate";
   if(hasGeom){
     numRow("Width",  ()=>n.w||80,  v=>{ n.w=Math.max(16,v); });
     numRow("Height", ()=>n.h||80,  v=>{ n.h=Math.max(16,v); });
@@ -1404,10 +1725,12 @@ function refreshProp(){
   }
   if(d.object){
     colRow("Color", OBJ_COLORS, ()=>n.color, v=>{ n.color=v; });
+    selRow("Style", [{value:"fill",label:"Fill"},{value:"frame",label:"Frame"}], ()=>n.objStyle||"fill", v=>{ n.objStyle=v; }); // ObjectStyle
     chkRow("Flip",     ()=>n.flip, v=>{ n.flip=v; });
-    chkRow("Dynamics", ()=>n.dyn, v=>{ n.dyn=v; });
-    numRow("Bounce",   ()=>Math.round((n.bounce||0)*100), v=>{ n.bounce=Math.min(1,Math.max(0,v/100)); });
-    numRow("Friction", ()=>Math.round((n.friction||0)*100), v=>{ n.friction=Math.min(1,Math.max(0,v/100)); });
+    chkRow("Dynamics", ()=>n.dyn, v=>{ n.dyn=v; }); // 物理ON/OFFのみ（各パラメータはSettingで全体設定）
+    selRow("Coord", [{value:"world",label:"World"},{value:"local",label:"Local"}], ()=>n.coordMode||"local", v=>{ n.coordMode=v; }); // 入力座標系
+    chkRow("Visible", ()=>n.visible!==false, v=>{ n.visible=v; });
+    txtRow("Destroyed By", ()=>n.destroyedBy||"", v=>{ n.destroyedBy=v; }); // このタグの弾で破壊される
   }
   if(hasGeom){
     txtRow("Tag",   ()=>n.tag||"", v=>{ n.tag=v; });
@@ -1425,21 +1748,27 @@ function refreshProp(){
     sel.onchange=()=>{ n.target = sel.value ? parseInt(sel.value) : null; };
     r.appendChild(lb); r.appendChild(sel); propPanel.appendChild(r);
   }
+  if(n.type==="getpos"||n.type==="getrot"){
+    selRow("Coord", [{value:"world",label:"World"},{value:"local",label:"Local"}], ()=>n.getCoord||"world", v=>{ n.getCoord=v; });
+  }
   // 親子構造は端子ワイヤーで設定するため、Propertyには出さない
   // テクスチャ編集
   if(d.tex){
+    selRow("Size", [{value:"8",label:"8"},{value:"16",label:"16"},{value:"32",label:"32"}],
+      ()=>String(n.texW||16), v=>{ resizeTexture(n, parseInt(v)); }); // サイズ変更で画像をなるべく残す
     const eb=document.createElement("button"); eb.className="del"; eb.style.background="#c79a10"; eb.style.borderColor="#e0c020";
     eb.textContent="EDIT TEXTURE";
     eb.onclick=()=> openTexEditor(n.id);
     propPanel.appendChild(eb);
   }
+  // Duplicate / Delete を1行に（幅 4:3 でDeleteを狭く）
+  const ddRow=document.createElement("div"); ddRow.style.cssText="display:flex;gap:8px;margin-top:8px";
   const dup=document.createElement("button"); dup.className="del"; dup.style.background="#2f7a4a"; dup.style.borderColor="#3fa060";
-  dup.textContent="DUPLICATE";
-  dup.onclick=()=>{ const c=duplicateNodes([n.id]); const nid=c&&c.size?[...c][0]:n.id; propNode=nid; selected=nid; refreshProp(); };
-  propPanel.appendChild(dup);
-  const del=document.createElement("button"); del.className="del"; del.textContent="DELETE";
+  dup.style.flex="4"; dup.style.margin="0"; dup.textContent="DUPLICATE";
+  dup.onclick=()=>{ const s=[...duplicateNodes([n.id])]; multiSel.clear(); selected=s[0]||null; propNode=null; refreshProp(); }; // 複製→新ノードを選択して閉じる
+  const del=document.createElement("button"); del.className="del"; del.style.flex="3"; del.style.margin="0"; del.textContent="DELETE";
   del.onclick=()=>{ recordUndo(); removeNode(n.id); if(selected===n.id) selected=null; propNode=null; refreshProp(); };
-  propPanel.appendChild(del);
+  ddRow.appendChild(dup); ddRow.appendChild(del); propPanel.appendChild(ddRow);
   propPanel.style.display="block";
 }
 
@@ -1453,13 +1782,14 @@ document.getElementById("playBtn").onclick=()=> (mode==="play")?stopPlay():start
 const menuBtn=document.getElementById("menuBtn");
 const flick=document.getElementById("flick");
 const FLICK_ITEMS=[
-  { key:"newnode", label:"NEW NODE", color:"#2f5a8a", run:()=>{ if(mode==="edit") showCreateMenu(W/2, Math.max(120,H*0.4)); } },
+  { key:"newnode", label:"NEW NODE", color:"#2f5a8a", run:()=>{ if(mode==="edit"||mode==="layout") showCreateMenu(W/2, Math.max(120,H*0.4)); } },
   { key:"save", label:"SAVE", color:"#c0392b", run:()=>openSaveDialog() },
   { key:"load", label:"LOAD", color:"#2b6fd0", run:()=>openLoadDialog() },
   { key:"undo", label:"UNDO", color:"#6b5bd0", run:()=>undo() },
   { key:"redo", label:"REDO", color:"#6b5bd0", run:()=>redo() },
   { key:"fit",  label:"FIT",  color:"#1f7a3a", run:fitView },
   { key:"new",  label:"NEW",  color:"#555b68", run:doNew },
+  { key:"setting", label:"SETTING", color:"#8a6d3b", run:()=>openAppSettings() },
 ];
 let flickEls=[], flickHot=null;
 function openFlick(){
@@ -1470,15 +1800,20 @@ function openFlick(){
     ? { label:"EDITOR", color:"#1f7a3a", run:()=>setMode("edit") }   // Editorテーマ=緑
     : { label:"LAYOUT", color:"#21b3d6", run:()=>setMode("layout") }; // Layoutテーマ=水色
   const items=[modeItem, ...FLICK_ITEMS];
-  items.forEach((it,i)=>{
+  // 2列に分割：SAVE/LOAD/NEW は左列、それ以外は右列（従来位置）
+  const leftKeys=new Set(["save","load","new","setting"]);
+  const rightCol = items.filter(it=>!leftKeys.has(it.key));
+  const leftCol  = items.filter(it=> leftKeys.has(it.key));
+  const place=(list,colX)=>{ list.forEach((it,i)=>{
     const el=document.createElement("div"); el.className="fi"; el.textContent=it.label;
     el.style.background=it.color;
-    el.style.left=(bx-165)+"px";            // MENUの左側に縦に並べる
+    el.style.left=colX+"px";
     el.style.top =(by + i*68)+"px";
     el._it=it; flick.appendChild(el); flickEls.push(el);
-    // タップでも実行できる（フリックしなくてもOK）
     el.addEventListener("pointerup", ev=>{ ev.stopPropagation(); const run=it.run; closeFlick(false); run(); });
-  });
+  }); };
+  place(rightCol, bx-165);        // 右列（MENUの左側）
+  place(leftCol,  bx-165-155);    // 左列（さらに左）
   flick.style.display="block";
 }
 function updateFlick(sx,sy){
@@ -1529,21 +1864,42 @@ function modal(build){ const ov=document.createElement("div");
   ov.style.cssText="position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center";
   const box=document.createElement("div");
   box.style.cssText="background:#1c2029;border:1px solid #3a4150;border-radius:14px;padding:16px;min-width:280px;max-width:90%;max-height:80%;overflow:auto;box-shadow:0 12px 36px rgba(0,0,0,.6)";
-  ov.appendChild(box); ov.onclick=e=>{ if(e.target===ov) document.body.removeChild(ov); };
-  build(box, ()=>{ if(ov.parentNode) document.body.removeChild(ov); });
+  ov.appendChild(box); ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  build(box, ()=>{ ov.remove(); });
   document.getElementById("app").appendChild(ov); return ov; }
 function mkBtn(label,bg){ const b=document.createElement("button");
   b.textContent=label; b.style.cssText=`height:46px;padding:0 16px;border-radius:10px;border:1px solid #3a4150;background:${bg||'#242a37'};color:#fff;font-size:15px;font-weight:800;cursor:pointer`; return b; }
 // カラーピッカー（Unity版パレット）
 function openColorPicker(current, onPick){ modal((box,close)=>{
-  const t=document.createElement("div"); t.textContent="COLOR"; t.style.cssText="color:#fff;font-size:18px;font-weight:800;margin-bottom:12px"; box.appendChild(t);
-  const grid=document.createElement("div"); grid.style.cssText="display:grid;grid-template-columns:repeat(9,1fr);gap:6px";
+  // ヘッダー：タイトル＋右上に閉じるボタン（Property同様）
+  const hd=document.createElement("div"); hd.style.cssText="display:flex;align-items:center;margin-bottom:12px";
+  const t=document.createElement("div"); t.textContent="COLOR"; t.style.cssText="color:#fff;font-size:18px;font-weight:800";
+  const cl=document.createElement("button"); cl.className="pclose"; cl.textContent="×"; cl.onclick=close;
+  hd.appendChild(t); hd.appendChild(cl); box.appendChild(hd);
+  // Unity版と同じ 13列×9行
+  const grid=document.createElement("div"); grid.style.cssText="display:grid;grid-template-columns:repeat(13,1fr);gap:5px";
   UNITY_PALETTE.forEach(col=>{ const sw=document.createElement("div");
-    sw.style.cssText=`width:30px;height:30px;border-radius:6px;background:${col};cursor:pointer;border:2px solid ${current===col?'#fff':'rgba(255,255,255,.2)'}`;
+    sw.style.cssText=`width:24px;height:24px;border-radius:5px;background:${col};cursor:pointer;border:2px solid ${current===col?'#fff':'rgba(255,255,255,.2)'}`;
     sw.onclick=()=>{ onPick(col); close(); }; grid.appendChild(sw); });
   box.appendChild(grid);
 }); }
 
+// アプリ共通設定ダイアログ
+function openAppSettings(){ modal((box,close)=>{
+  const hd=document.createElement("div"); hd.style.cssText="display:flex;align-items:center;margin-bottom:14px";
+  const t=document.createElement("div"); t.textContent="SETTING"; t.style.cssText="color:#fff;font-size:18px;font-weight:800";
+  const cl=document.createElement("button"); cl.className="pclose"; cl.textContent="×"; cl.onclick=close;
+  hd.appendChild(t); hd.appendChild(cl); box.appendChild(hd);
+  // ワイヤーの描き方：曲線 / 直線
+  const row=document.createElement("div"); row.style.cssText="display:flex;align-items:center;gap:12px;color:#c3cad8;font-size:15px;font-weight:700";
+  const lb=document.createElement("label"); lb.textContent="Wire"; lb.style.minWidth="70px";
+  const sel=document.createElement("select");
+  sel.style.cssText="flex:1;height:44px;border-radius:9px;border:1px solid #3a4150;background:#12141a;color:#fff;font-size:15px;font-weight:700;padding:0 10px";
+  [{value:"curve",label:"Curve"},{value:"straight",label:"Straight"}].forEach(o=>{
+    const op=document.createElement("option"); op.value=o.value; op.textContent=o.label; if((appSettings.wireStyle||"curve")===o.value) op.selected=true; sel.appendChild(op); });
+  sel.onchange=()=>{ appSettings.wireStyle=sel.value; saveAppSettings(); };
+  row.appendChild(lb); row.appendChild(sel); box.appendChild(row);
+}); }
 function openSaveDialog(){ modal((box,close)=>{
   const t=document.createElement("div"); t.textContent="SAVE"; t.style.cssText="color:#fff;font-size:18px;font-weight:800;margin-bottom:12px"; box.appendChild(t);
   const nm=document.createElement("input"); nm.type="text"; nm.value=currentFile||"untitled";
@@ -1583,11 +1939,30 @@ function deserialize(s){ const o=JSON.parse(s); nodes=o.nodes||[]; conns=o.conns
       if(n.limitAxis==null)n.limitAxis=false; if(n.visible==null)n.visible=true;
       if(n.style==null)n.style="frame"; if(n.keyMode==null)n.keyMode=(n.useKey?"wasd":"off");
       if(n.cntlMode==null)n.cntlMode="off"; if(n.hideOnPc==null)n.hideOnPc=false; }
-    if(n.type==="button"){ if(n.output==null)n.output="momentary"; if(n.visible==null)n.visible=true;
+    if(n.type==="button"){ if(n.visible==null)n.visible=true;
       if(n.style==null)n.style="frame"; if(n.keyCode==null)n.keyCode=(n.useKey?" ":"");
       if(n.cntlBtn==null)n.cntlBtn="off"; if(n.hideOnPc==null)n.hideOnPc=false; }
   } });
   nodes.forEach(n=>{ if(NODE_TYPES[n.type]&&n.type==="keyboard"&&n.keyCode==null) n.keyCode=" "; });
+  nodes.forEach(n=>{ if(n.type==="compare"&&n.compareMode==null) n.compareMode="gt";
+    if(n.type==="random"){ if(n.rndNum==null)n.rndNum=6; if(n.useSeed==null)n.useSeed=false; if(n.seed==null)n.seed=0; }
+    if(n.type==="trigger"&&n.triggerDelay==null) n.triggerDelay=0;
+    if(n.type==="counter"){ if(n.cntType==null)n.cntType="none"; if(n.cntMin==null)n.cntMin=0; if(n.cntMax==null)n.cntMax=100; }
+    if(n.type==="int"&&n.intType==null) n.intType="floor";
+    if(n.type==="var"&&n.varInit==null) n.varInit=0;
+    if(n.type==="array"&&n.arrInit==null) n.arrInit="";
+    if((n.type==="getpos"||n.type==="getrot")&&n.getCoord==null) n.getCoord="world";
+    if(n.type==="sound"){ if(n.volume==null)n.volume=10; if(n.tone==null)n.tone=0; }
+    if(attachesToObject(n)){ if(n.w==null)n.w=60; if(n.h==null)n.h=60; if(n.angle==null)n.angle=0;
+      if(n.layoutX==null){ const oc=nodes.filter(m=>showsInLayout(m)).length; n.layoutX=(oc%5)*100-200; n.layoutY=Math.floor(oc/5)*100-100; } }
+    if(n.type==="setting"){ if(n.dynamics==null)n.dynamics=true; if(n.setFriction==null)n.setFriction=0.4; if(n.setBounce==null)n.setBounce=0.0; if(n.setDrag==null)n.setDrag=0.0; if(n.stopBtnColor==null)n.stopBtnColor="#ffffff";
+      if(n.gravity==null)n.gravity=1; else if(n.gravity>50)n.gravity=n.gravity/2000; } // 旧データ(生px/s^2)は倍率へ変換
+    if(n.type==="contact"){ if(n.contactTarget==null)n.contactTarget="all"; if(n.contactShape==null)n.contactShape="rect"; }
+    if(n.type==="onbreak"){ if(n.breakColor==null)n.breakColor="#ffffff"; if(n.breakEffect==null)n.breakEffect="none"; if(n.breakTag==null)n.breakTag=""; }
+    if(n.type==="text"&&n.outline==null) n.outline=false;
+    if(n.type==="shot"){ if(n.bulletCount==null)n.bulletCount=1; if(n.bulletInterval==null)n.bulletInterval=0;
+      if(n.size==null)n.size=(n.bulletSize||28); if(n.bulletShape==null)n.bulletShape="circle"; }
+    if(NODE_TYPES[n.type]&&NODE_TYPES[n.type].object){ if(n.objStyle==null)n.objStyle="fill"; if(n.coordMode==null)n.coordMode="local"; if(n.visible==null)n.visible=true; if(n.destroyedBy==null)n.destroyedBy=""; } });
   nodes.forEach(n=>{ if(isStage(n)&&n.parentNodeId) recomputeLocal(n); }); // 親子ローカル復元
 }
 
@@ -1616,18 +1991,10 @@ function centerReadable(){
 //  デフォルトのサンプル（KEYで RECT を動かす）
 // =====================================================================
 function sample(){
-  const stk=addNode("stick",-190,-130); stk.useKey=true; stk.layoutX=-230; stk.layoutY=150; // 画面スティック＋キーボード
-  const spd=addNode("const",-190,90); spd.value=320;
-  const mx=addNode("mul",70,-150);
-  const my=addNode("mul",70,50);
-  const rc=addNode("rect",330,-60); rc.color="#3ad0ff"; rc.dyn=true; // プレイヤー（重力ON）
-  rc.w=70; rc.h=70; rc.layoutX=0; rc.layoutY=-200;
-  connect(stk.id,0, mx.id,0); connect(spd.id,0, mx.id,1);
-  connect(stk.id,1, my.id,0); connect(spd.id,0, my.id,1);
-  connect(mx.id,0, rc.id,0);  connect(my.id,0, rc.id,1);
-  // 静的な足場（重力OFF＝乗れるブロック）。床はこの足場のみ（画面下の自動床なし）
-  const plat=addNode("rect",330,140); plat.color="#c084fc"; plat.dyn=false;
-  plat.w=320; plat.h=40; plat.layoutX=0; plat.layoutY=80;
+  // 初期画面：Constant（値1）→ Text だけ
+  const c=addNode("const",-120,0); c.value=1;
+  const tx=addNode("text",120,0); tx.layoutX=0; tx.layoutY=0;
+  connect(c.id,0, tx.id,0);
   centerReadable();
 }
 sample();

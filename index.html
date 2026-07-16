@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#12141a">
-<title>nodegram web</title>
+<title>nodegram</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { width:100%; height:100%; overflow:hidden; background:#12141a;
@@ -172,15 +172,24 @@ const NODE_TYPES = {
   onbreak:  { label:"ONBREAK",glyph:"BRK",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
   rotate:   { label:"ROTATE", glyph:"ROT",  inputs:["av"],        outputs:[], color:"#e0c020", stage:"rotate" },
   velocity: { label:"VELOCITY",glyph:"VEL", inputs:[],            outputs:["X","Y"], color:"#e0c020", target:true },
-  screen:   { label:"SCREEN", glyph:"SCR",  inputs:["X","Y","S"], outputs:["W","H"], color:"#e0c020", target:true },
+  screen:   { label:"SCREEN", glyph:"SCR",  inputs:["X","Y","S"], outputs:["W","H"], color:"#e0c020" },
   // シーン設定（灰）
   bg:       { label:"BG",     glyph:"BG",   inputs:[],            outputs:[], color:"#6b7280" },
   setting:  { label:"SETTING",glyph:"SET",  inputs:[],            outputs:[], color:"#6b7280" },
 };
 const isStage = n => { const d=NODE_TYPES[n.type]; return !!(d.object || d.stage); };
-// レイアウト画面に表示・配置する対象（オブジェクト系＋オブジェクトに付随する CONTACT/ONBREAK/TEXTURE）
-const showsInLayout = n => isStage(n) || attachesToObject(n);
+// レイアウト画面に表示・配置する対象（オブジェクト系＋CONTACT/ONBREAK。TEXTUREはオブジェクトに描画されるので除外）
+const showsInLayout = n => isStage(n) || n.type==="contact" || n.type==="onbreak";
 const attachesToObject = n => ['texture','contact','onbreak'].includes(n.type);
+// KEYBOARD/BUTTONで割り当て可能なキー：全アルファベット・全数字・記号・Tab/Esc・矢印・SPACE/ENTER
+const KEYBOARD_OPTS=(function(){
+  const a=[{value:"",label:"Off"},{value:" ",label:"SPACE"},{value:"enter",label:"ENTER"},{value:"tab",label:"TAB"},{value:"escape",label:"ESC"},
+    {value:"arrowup",label:"↑"},{value:"arrowdown",label:"↓"},{value:"arrowleft",label:"←"},{value:"arrowright",label:"→"}];
+  for(let c=97;c<=122;c++){ const ch=String.fromCharCode(c); a.push({value:ch,label:ch.toUpperCase()}); } // a-z
+  for(let d=0;d<=9;d++){ a.push({value:String(d),label:String(d)}); } // 0-9
+  ["@","[",";",":","]",",",".","/","*","-","+"].forEach(s=>a.push({value:s,label:s})); // 記号
+  return a;
+})();
 const PALETTE = ["const",
   "add","sub","mul","div","root","compare","not","arctan","angletopos","random","int",
   "trigger","counter","var","array","getpos","getrot",
@@ -380,8 +389,9 @@ function outputValue(node, port, seen){
     case "stick": {
       let x=node.stickX||0, y=node.stickY||0;
       const km=node.keyMode||(node.useKey?"wasd":"off");
-      if(km!=="off"){ const ax=keyModeAxis(km); x+=ax.x; y+=ax.y;
-        x=Math.max(-1,Math.min(1,x)); y=Math.max(-1,Math.min(1,y)); }
+      if(km!=="off"){ const ax=keyModeAxis(km); x+=ax.x; y+=ax.y; }
+      if((node.cntlMode||"off")!=="off"){ const g=padStickAxis(node.cntlMode); x+=g.x; y+=g.y; } // ゲームパッド
+      x=Math.max(-1,Math.min(1,x)); y=Math.max(-1,Math.min(1,y));
       if(node.limitAxis){ if(Math.abs(x)>=Math.abs(y)) y=0; else x=0; }
       if(node.mode==="digital"){ const th=node.threshold||0.3;
         x = x>th?1:(x<-th?-1:0); y = y>th?1:(y<-th?-1:0); }
@@ -389,7 +399,8 @@ function outputValue(node, port, seen){
     }
     case "button": { // Momentaryのみ：押している間だけ1（Pulse相当はTriggerノードで）
       const bk=node.keyCode||(node.useKey?" ":"");
-      const phys = (node.pressed?1:0) || (bk && heldKeys.has(bk) ? 1:0);
+      const phys = (node.pressed?1:0) || (bk && heldKeys.has(bk) ? 1:0)
+        || ((node.cntlBtn||"off")!=="off" && padButtonPressed(node.cntlBtn) ? 1:0); // ゲームパッド
       return phys?1:0;
     }
     case "keyboard": return heldKeys.has((node.keyCode||" ")) ? 1 : 0;
@@ -442,7 +453,7 @@ function startPlay(){
   // レイアウトで置いた位置から開始 & 状態ノードをリセット
   nodes.forEach(n=>{
     if(isStage(n)){ n.playX=n.layoutX||0; n.playY=n.layoutY||0; n.vy=0; n.grounded=false;
-      n.playAngle=n.angle||0; n._lastX=n.playX; n._lastY=n.playY; n._vx=0; n._vy=0; n._rawvx=0; n._rawvy=0; n._face=1; }
+      n.playAngle=n.angle||0; n._lastX=n.playX; n._lastY=n.playY; n._vx=0; n._vy=0; n._rawvx=0; n._rawvy=0; n._face=1; n._spin=0; }
     if(n.type==="velocity"){ n._ovx=0; n._ovy=0; }
     if(n.type==="stick"){ n.stickX=0; n.stickY=0; n.stickPid=null; }
     if(n.type==="button"){ n.pressed=0; n.btnPid=null; }
@@ -559,8 +570,9 @@ function playStep(dt){
   const S_DRAG = settingNode && settingNode.setDrag!=null ? settingNode.setDrag : 0.0;
   const objs = nodes.filter(n=>NODE_TYPES[n.type].object);
 
-  // ROTATE：角速度で自身のplayAngleを回す（子が追従する）
-  for(const n of nodes){ if(n.type==="rotate") n.playAngle=(n.playAngle||0)+inputValue(n,0)*dt; }
+  // ROTATE：角速度を_spinに積算（関節）。子はRotの位置で回転して追従。親がいる場合はapplyHierarchyで親角度に加算
+  for(const n of nodes){ if(n.type==="rotate"){ n._spin=(n._spin||0)+inputValue(n,0)*dt;
+    if(!n.parentNodeId||!nodeById(n.parentNodeId)) n.playAngle=(n.angle||0)+n._spin; } }
   // SOUND：入力1=Signal(S)がある間ずっと鳴る。入力0=Tone(T,接続時は上書き)で音程
   for(const n of nodes){ if(n.type!=="sound") continue;
     const s=inputValue(n,1);
@@ -658,16 +670,13 @@ function playStep(dt){
   for(const n of nodes){ if(n.type!=="velocity") continue; const t=nodeById(n.target); if(!t) continue;
     const f=Math.max(1,n.frames||5); n._ovx=(n._ovx||0)+((t._rawvx||0)-(n._ovx||0))/f; n._ovy=(n._ovy||0)+((t._rawvy||0)-(n._ovy||0))/f; }
 
-  // 6) SCREEN：対象を画面中央に追従するカメラ
+  // 6) SCREEN：入力X,Yで手動、または親に指定したオブジェクトを画面中央に追従
   const scrN = nodes.find(n=>n.type==="screen");
   if(scrN && (conns.some(c=>c.b===scrN.id&&c.bi===0)||conns.some(c=>c.b===scrN.id&&c.bi===1))){
-    // 入力X,Y でカメラを手動制御（入力2=Scaleは今後用に保持）
-    playCam.x=-inputValue(scrN,0); playCam.y=-inputValue(scrN,1);
-  } else {
-    const scr = nodes.find(n=>n.type==="screen" && nodeById(n.target));
-    if(scr){ const t=nodeById(scr.target); playCam.x=-(t.playX||0); playCam.y=-(t.playY||0); }
-    else { playCam.x=0; playCam.y=0; }
-  }
+    playCam.x=-inputValue(scrN,0); playCam.y=-inputValue(scrN,1); // 入力X,Yでカメラ手動制御
+  } else if(scrN && nodeById(scrN.parentNodeId)){
+    const t=nodeById(scrN.parentNodeId); playCam.x=-(t.playX||0); playCam.y=-(t.playY||0); // 親オブジェクト追従
+  } else { playCam.x=0; playCam.y=0; }
 }
 // 簡易ビープ（WebAudio）
 let _audioCtx=null;
@@ -718,7 +727,7 @@ function applyHierarchy(){
     const a=pa*Math.PI/180, lx=n.lx||0, ly=n.ly||0;
     n.playX = p.playX + lx*Math.cos(a)-ly*Math.sin(a);
     n.playY = p.playY + lx*Math.sin(a)+ly*Math.cos(a);
-    n.playAngle = pa + (n.la||0);
+    n.playAngle = pa + (n.la||0) + (n.type==="rotate"?(n._spin||0):0); // ROTATEは関節として自身の回転を加算
   }
 }
 
@@ -737,7 +746,7 @@ function draw(){
 const PARENT_COL="#ff9b30"; // 親子端子：明るいオレンジ
 const IN_COL="#3ba7ff";     // 入力端子：明るい青
 const OUT_COL="#ff5a5a";    // 出力端子：明るい赤
-function readsParentObject(n){ return n.type==="getpos"||n.type==="getrot"; } // 親オブジェクトの座標/回転を取得
+function readsParentObject(n){ return n.type==="getpos"||n.type==="getrot"||n.type==="screen"; } // 親オブジェクトを参照（GetPos/GetRot/Screen）
 function canHaveParent(n){ return isStage(n) || attachesToObject(n) || readsParentObject(n); }
 function parentPortPos(n){ return w2s(n.x, n.y - NS/2); } // 上：自分の親へつなぐ端子
 function childPortPos(n){  return w2s(n.x, n.y + NS/2); } // 下：子を受け入れる端子
@@ -1229,7 +1238,8 @@ function onMove(sx,sy){
   else if(drag.kind==="selboxL"){ drag.x1=sx; drag.y1=sy; }
   else if(drag.kind==="layoutpan"){ layoutView.x=drag.vx-(sx-drag.sx)/layoutView.s; layoutView.y=drag.vy-(sy-drag.sy)/layoutView.s; }
   else if(drag.kind==="resize"){ const n=nodeById(drag.node); if(n){ const l=objToLocal(n,sx,sy);
-    n.w=Math.max(16,Math.round(Math.abs(l.x)*2)); n.h=Math.max(16,Math.round(Math.abs(l.y)*2)); } }
+    if(n.type==="circle"){ const r=Math.max(8,Math.round(Math.hypot(l.x,l.y))); n.w=r*2; n.h=r*2; } // 真円：縦横同時
+    else { n.w=Math.max(16,Math.round(Math.abs(l.x)*2)); n.h=Math.max(16,Math.round(Math.abs(l.y)*2)); } } }
   else if(drag.kind==="rotate"){ const n=nodeById(drag.node); if(n){ const c=objCenter(n);
     const raw=Math.atan2(sy-c.y,sx-c.x)*180/Math.PI + 90;
     n.angle=Math.round(raw/5)*5;           // 5度刻み
@@ -1488,11 +1498,23 @@ const KEYSETS={
 function keyModeAxis(km){ const s=KEYSETS[km]; if(!s) return {x:0,y:0};
   return { x:(heldKeys.has(s.r)?1:0)-(heldKeys.has(s.l)?1:0),
            y:(heldKeys.has(s.d)?1:0)-(heldKeys.has(s.u)?1:0) }; }
+// ===== ゲームパッド（Gamepad API）=====
+function getPad(){ try{ const ps=navigator.getGamepads?navigator.getGamepads():[]; for(const g of ps){ if(g) return g; } }catch(e){} return null; }
+function padStickAxis(mode){ const g=getPad(); if(!g) return {x:0,y:0};
+  const dz=v=>Math.abs(v)<0.18?0:v, ax=g.axes||[], bt=g.buttons||[];
+  if(mode==="lstick") return {x:dz(ax[0]||0), y:dz(ax[1]||0)};
+  if(mode==="rstick") return {x:dz(ax[2]||0), y:dz(ax[3]||0)};
+  if(mode==="dpad"){ const L=bt[14]&&bt[14].pressed, R=bt[15]&&bt[15].pressed, U=bt[12]&&bt[12].pressed, D=bt[13]&&bt[13].pressed;
+    return {x:(R?1:0)-(L?1:0), y:(D?1:0)-(U?1:0)}; }
+  return {x:0,y:0}; }
+const PAD_BTN={a:0,b:1,x:2,y:3,lb:4,rb:5,lt:6,rt:7};
+function padButtonPressed(name){ const g=getPad(); if(!g||!(name in PAD_BTN)) return false; const b=(g.buttons||[])[PAD_BTN[name]]; return !!(b&&b.pressed); }
 window.addEventListener("keydown", e=>{
   // 入力欄の編集中はショートカット・削除を無効化（CONST値編集でノードが消えるのを防ぐ）
   const ae=document.activeElement; if(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
   const k=KMAP[e.key]; if(k){ keys[k]=true; e.preventDefault(); }
   heldKeys.add(e.key.toLowerCase());
+  if(mode==="play" && (e.key==="Tab"||e.key==="Escape"||e.key===" ")) e.preventDefault(); // ゲームキーの既定動作を抑止
   if((e.key==="Delete"||e.key==="Backspace") && mode==="edit"){
     if(multiSel.size){ recordUndo(); [...multiSel].forEach(id=>removeNode(id)); multiSel.clear(); selected=null; }
     else if(selected){ recordUndo(); removeNode(selected); selected=null; }
@@ -1623,11 +1645,9 @@ function refreshProp(){
   const STICK_STYLE_OPTS=[{value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},{value:"inner",label:"INNER"},{value:"off",label:"OFF"}];
   const KEYMODE_OPTS=[{value:"off",label:"Off"},{value:"wasd",label:"WASD"},{value:"ijkl",label:"IJKL"},{value:"cursor",label:"Cursor"},{value:"8462",label:"8462"}];
   const CNTL_OPTS=[{value:"off",label:"Off"},{value:"lstick",label:"L-Stick"},{value:"rstick",label:"R-Stick"},{value:"dpad",label:"DPAD"}];
-  const KEY_OPTS=[{value:"",label:"Off"},{value:" ",label:"SPACE"},{value:"enter",label:"ENTER"},
-    {value:"arrowup",label:"↑"},{value:"arrowdown",label:"↓"},{value:"arrowleft",label:"←"},{value:"arrowright",label:"→"},
-    {value:"w",label:"W"},{value:"a",label:"A"},{value:"s",label:"S"},{value:"d",label:"D"},
-    {value:"i",label:"I"},{value:"j",label:"J"},{value:"k",label:"K"},{value:"l",label:"L"},
-    {value:"z",label:"Z"},{value:"x",label:"X"},{value:"c",label:"C"}];
+  const BTN_CNTL_OPTS=[{value:"off",label:"Off"},{value:"a",label:"A"},{value:"b",label:"B"},{value:"x",label:"X"},{value:"y",label:"Y"},
+    {value:"lb",label:"LB"},{value:"rb",label:"RB"},{value:"lt",label:"LT"},{value:"rt",label:"RT"}];
+  const KEY_OPTS=KEYBOARD_OPTS; // 全アルファベット・数字・記号・Tab/Escを含む（下部で定義）
   if(n.type==="stick"){
     selRow("Style",  STICK_STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
     colRow("Color",  OBJ_COLORS, ()=>n.color||"#e0892b", v=>{ n.color=v; });
@@ -1646,7 +1666,7 @@ function refreshProp(){
     numRow("Width",  ()=>n.w||150, v=>{ n.w=Math.max(24,v); }); // Unity: RECT WIDTH/HEIGHT
     numRow("Height", ()=>n.h||150, v=>{ n.h=Math.max(24,v); });
     selRow("Keyboard",   KEY_OPTS,  ()=>n.keyCode||"", v=>{ n.keyCode=v; });
-    selRow("Controller", CNTL_OPTS, ()=>n.cntlBtn||"off", v=>{ n.cntlBtn=v; });
+    selRow("Controller", BTN_CNTL_OPTS, ()=>n.cntlBtn||"off", v=>{ n.cntlBtn=v; });
     chkRow("Hide on PC", ()=>n.hideOnPc, v=>{ n.hideOnPc=v; });
   }
   if(n.type==="keyboard"){
@@ -1718,7 +1738,9 @@ function refreshProp(){
   }
   // 幾何プロパティ（STICK/BUTTON/SHOTは独自UIなので除外）＝ Unity順: W/H → Angle → Color/Flip/Dynamics → Tag → Layer
   const hasGeom = d.object || d.stage==="text" || d.stage==="rotate";
-  if(hasGeom){
+  if(n.type==="circle"){
+    numRow("Radius", ()=>Math.round((n.w||80)/2), v=>{ const r=Math.max(4,v); n.w=r*2; n.h=r*2; }); // 真円：W/H同時
+  } else if(hasGeom){
     numRow("Width",  ()=>n.w||80,  v=>{ n.w=Math.max(16,v); });
     numRow("Height", ()=>n.h||80,  v=>{ n.h=Math.max(16,v); });
     numRow("Angle",  ()=>n.angle||0, v=>{ n.angle=v; });
@@ -1919,7 +1941,7 @@ function openLoadDialog(){ modal((box,close)=>{
   list.forEach(name=>{ const r=document.createElement("div"); r.style.cssText="display:flex;gap:8px;margin-bottom:8px;align-items:center";
     const ld=mkBtn(name,"#2b6fd0"); ld.style.flex="1"; ld.style.justifyContent="flex-start"; ld.style.textAlign="left";
     ld.onclick=()=>{ loadSlot(name); close(); };
-    const del=mkBtn("×","#a12b2b"); del.style.width="48px";
+    const del=mkBtn("×","#a12b2b"); del.style.width="48px"; del.style.fontSize="38px"; del.style.lineHeight="1";
     del.onclick=()=>{ if(confirm(name+" を削除しますか？")){ deleteSlot(name); close(); openLoadDialog(); } };
     r.appendChild(ld); r.appendChild(del); box.appendChild(r); });
   const ca=mkBtn("CANCEL","#555b68"); ca.style.width="100%"; ca.onclick=close; box.appendChild(ca);

@@ -57,8 +57,8 @@
     max-height:calc(100vh - 24px); overflow-y:auto; }
   #createMenu .title { color:#8a92a6; font-size:13px; font-weight:800; padding:2px 4px 10px; letter-spacing:.05em; }
   #createMenu .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
-  #createMenu .ci { height:38px; padding:0 4px; border-radius:10px; border:1px solid rgba(0,0,0,.35);
-    color:#fff; font-size:15.6px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  #createMenu .ci { height:40px; padding:0 4px; border-radius:10px; border:1px solid rgba(0,0,0,.35);
+    color:#fff; font-size:17.2px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center;
     text-align:center; text-shadow:0 1px 2px rgba(0,0,0,.5); overflow:hidden; white-space:nowrap; }
   #createMenu .ci:active { background:#2f3646; }
 
@@ -1564,26 +1564,26 @@ function showCreateMenu(sx,sy){
   const landscape = W>H;
   const row=createMenu.querySelector(".row");
   if(landscape){
-    // 横画面：左の空きを15%に（幅=画面の85%）。ボタン幅を狭くして列数を増やす
+    // 横画面：幅=画面の85%。ボタンが狭くなりすぎないよう1列あたり約108px
     const width=Math.round(W*0.85);
     createMenu.style.width=width+"px"; createMenu.style.maxWidth="none";
-    const cols=Math.max(4, Math.floor(width/92)); // 1列あたり約92px（ボタン+gap）
+    const cols=Math.max(4, Math.floor(width/108));
     row.style.gridTemplateColumns=`repeat(${cols},1fr)`;
   } else {
-    // 縦画面：幅いっぱい近く（左右5%）。ボタンを狭めて列数を増やす
-    const width=Math.round(W*0.9);
+    // 縦画面：左の隙間なし（ほぼ全幅）。1列あたり約102px
+    const width=W-16;
     createMenu.style.width=width+"px"; createMenu.style.maxWidth="none";
-    const cols=Math.max(3, Math.floor(width/92));
+    const cols=Math.max(3, Math.floor(width/102));
     row.style.gridTemplateColumns=`repeat(${cols},1fr)`;
   }
   const mw=createMenu.offsetWidth||220, mh=createMenu.offsetHeight||180;
   let left, top;
   if(landscape){
-    left = W - mw - 12;                         // 画面右側に寄せて8割を埋める
+    left = W - mw - 12;                         // 画面右側に寄せる
     top  = Math.max(10, Math.min(H-mh-6, sy-10));
   } else {
-    left = Math.max(6, Math.min(W-mw-6, sx-mw/2));
-    top  = 16;                                  // 縦画面はもっと上（ほぼ画面上端）に表示
+    left = 8;                                    // 縦画面：左の隙間なし（ほぼ全幅）
+    top  = 16;                                   // 画面上端付近
   }
   createMenu.style.left=left+"px"; createMenu.style.top=top+"px";
 }

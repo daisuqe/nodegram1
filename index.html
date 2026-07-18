@@ -73,7 +73,8 @@
   /* プロパティパネル（選択ノード） */
   #propPanel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:15;
     background:rgba(28,32,42,.98); border:1px solid #3a4150; border-radius:14px; padding:16px 18px; display:none;
-    min-width:240px; box-shadow:0 12px 36px rgba(0,0,0,.6); }
+    min-width:240px; max-width:calc(100vw - 20px); box-shadow:0 12px 36px rgba(0,0,0,.6); }
+  #propPanel .pbody { display:grid; grid-template-columns:1fr; gap:0 16px; }
   #propPanel .pt { color:#fff; font-size:17px; font-weight:800; margin-bottom:10px; display:flex; align-items:center; }
   .pclose { margin-left:auto; width:44px; height:44px; border-radius:8px; border:1px solid #2a91ad;
     background:#21b3d6; color:#fff; font-size:40px; font-weight:800; cursor:pointer; line-height:1; }
@@ -483,7 +484,7 @@ function startPlay(){
     if(n.type==="trigger"){ n._prevSig=0; n._delay=-1; n.pulse=0; }
     if(n.type==="random"){ n.rnd=null; n._prevT=0; n._rngState = n.useSeed ? ((n.seed||0)>>>0) : null; }
   });
-  bullets=[]; effects=[]; playCam={x:0,y:0}; destroyed=new Set(); brokenThisFrame=new Set();
+  bullets=[]; effects=[]; playCam={x:0,y:0,s:1}; destroyed=new Set(); brokenThisFrame=new Set();
   touchX=0; touchY=0; touchDown=0;
   try{ if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(_audioCtx.state==="suspended") _audioCtx.resume(); }catch(e){} // 実機の音声許可
   // 親子ローカル座標を確定（Play中の追従に使用）
@@ -695,13 +696,17 @@ function playStep(dt){
   for(const n of nodes){ if(n.type!=="velocity") continue; const t=nodeById(n.target); if(!t) continue;
     const f=Math.max(1,n.frames||5); n._ovx=(n._ovx||0)+((t._rawvx||0)-(n._ovx||0))/f; n._ovy=(n._ovy||0)+((t._rawvy||0)-(n._ovy||0))/f; }
 
-  // 6) SCREEN：入力X,Yで手動、または親に指定したオブジェクトを画面中央に追従
+  // 6) SCREEN：親を指定していればParent＋XYSはオフセット。親なしならXYはワールド座標。Sはスケール（未接続=1）
   const scrN = nodes.find(n=>n.type==="screen");
-  if(scrN && (conns.some(c=>c.b===scrN.id&&c.bi===0)||conns.some(c=>c.b===scrN.id&&c.bi===1))){
-    playCam.x=-inputValue(scrN,0); playCam.y=-inputValue(scrN,1); // 入力X,Yでカメラ手動制御
-  } else if(scrN && nodeById(scrN.parentNodeId)){
-    const t=nodeById(scrN.parentNodeId); playCam.x=-(t.playX||0); playCam.y=-(t.playY||0); // 親オブジェクト追従
-  } else { playCam.x=0; playCam.y=0; }
+  if(scrN){
+    const par=nodeById(scrN.parentNodeId);
+    const offX = conns.some(c=>c.b===scrN.id&&c.bi===0) ? inputValue(scrN,0) : 0;
+    const offY = conns.some(c=>c.b===scrN.id&&c.bi===1) ? inputValue(scrN,1) : 0;
+    let s = conns.some(c=>c.b===scrN.id&&c.bi===2) ? inputValue(scrN,2) : 1; s=Math.max(0.05, s||1);
+    if(par){ playCam.x=-((par.playX||0)+offX); playCam.y=-((par.playY||0)+offY); } // 親＋オフセット
+    else { playCam.x=-offX; playCam.y=-offY; } // 親なし：ワールド座標
+    playCam.s = s;
+  } else { playCam.x=0; playCam.y=0; playCam.s=1; }
 }
 // 簡易ビープ（WebAudio）
 let _audioCtx=null;
@@ -1095,25 +1100,24 @@ function drawPlay(){
   // 背景（BGノードがあればその色）
   const bgNode = nodes.find(n=>n.type==="bg");
   ctx.fillStyle = bgNode ? (bgNode.color||"#0a0b10") : "#0a0b10"; ctx.fillRect(0,0,W,H);
-  const camX=playCam.x, camY=playCam.y;
-  // 床は自動描画しない（足場は静的オブジェクトで作る）
-  // ステージ要素（SORTLAYER順、破壊済みは非表示、操作UIは画面固定）
+  const camX=playCam.x, camY=playCam.y, camS=playCam.s||1;
   const uiTypes = new Set(["stick","button"]);
   const drawList = nodes.filter(n=>isStage(n) && !destroyed.has(n.id)
     && n.type!=="shot"                                                  // SHOT本体（発射口）はPlayに出さない
     && !((n.type==="stick"||n.type==="button") && uiCtrlHidden(n))
     && !objHidden(n));
   drawList.sort((a,b)=>(a.layer||50)-(b.layer||50));
-  for(const n of drawList){
-    const fixed = uiTypes.has(n.type);
-    const ox = fixed ? 0 : camX, oy = fixed ? 0 : camY;
-    drawStage(W/2+n.playX+ox, H/2+n.playY+oy, n, (n.playAngle!=null?n.playAngle:n.angle));
-  }
-  // 弾（カメラ追従）。形状はRect/Circle
+  const worldList=drawList.filter(n=>!uiTypes.has(n.type)), uiList=drawList.filter(n=>uiTypes.has(n.type));
+  // ワールド層（SCREENのScaleを画面中央基準で適用）
+  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(camS,camS); ctx.translate(-W/2,-H/2);
+  for(const n of worldList) drawStage(W/2+n.playX+camX, H/2+n.playY+camY, n, (n.playAngle!=null?n.playAngle:n.angle));
   for(const b of bullets){ ctx.fillStyle=b.color||"#ffe08a"; const s=b.size||28, cx=W/2+b.x+camX, cy=H/2+b.y+camY;
     if(b.shape==="rect"){ ctx.fillRect(cx-s/2, cy-s/2, s, s); }
     else { ctx.beginPath(); ctx.arc(cx, cy, s/2, 0, 7); ctx.fill(); } }
   drawEffects(camX,camY); // ONBREAKエフェクト
+  ctx.restore();
+  // UI（STICK/BUTTON）は画面固定・スケール非適用
+  for(const n of uiList) drawStage(W/2+n.playX, H/2+n.playY, n, (n.playAngle!=null?n.playAngle:n.angle));
   // 画面向き警告（SETTINGでYOKO/TATE指定時）
   const setN=nodes.find(n=>n.type==="setting");
   if(setN){ const wantTate=setN.orient==="tate", isLandscape=W>H;
@@ -1882,7 +1886,20 @@ function refreshProp(){
   const del=document.createElement("button"); del.className="del"; del.style.flex="3"; del.style.margin="0"; del.textContent="DELETE";
   del.onclick=()=>{ recordUndo(); removeNode(n.id); if(selected===n.id) selected=null; propNode=null; refreshProp(); };
   ddRow.appendChild(dup); ddRow.appendChild(del); propPanel.appendChild(ddRow);
+  // タイトルとDuplicate/Delete以外を pbody にまとめて、収まらなければ2列→スクロール
+  const pbody=document.createElement("div"); pbody.className="pbody";
+  [...propPanel.children].forEach(ch=>{ if(ch!==t && ch!==ddRow) pbody.appendChild(ch); });
+  propPanel.insertBefore(pbody, ddRow);
   propPanel.style.display="block";
+  layoutPropPanel(pbody);
+}
+// プロパティを画面に収める：はみ出たら2列、それでも/縦画面で収まらなければpbodyをスクロール
+function layoutPropPanel(pbody){
+  pbody.style.gridTemplateColumns="1fr"; pbody.style.maxHeight=""; pbody.style.overflowY="";
+  const avail = H - 24;
+  if(propPanel.offsetHeight > avail) pbody.style.gridTemplateColumns="1fr 1fr"; // 2列
+  if(propPanel.offsetHeight > avail){ const chrome = propPanel.offsetHeight - pbody.offsetHeight;
+    pbody.style.maxHeight = Math.max(120, avail - chrome) + "px"; pbody.style.overflowY="auto"; }
 }
 
 // ▶ ボタン：タップで再生/停止（Editor/Layout どちらからも再生できる）

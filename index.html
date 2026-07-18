@@ -22,12 +22,12 @@
     border:1px solid rgba(0,0,0,.35); user-select:none; }
   .cplay { top:14px; background:#1f7a3a; color:#fff; font-size:34px; }
   .cplay.stop { background:transparent; border-color:transparent; }
-  .cplay .stopsq { width:38px; height:38px; border-radius:9px; border:4px solid #fff; background:transparent; }
+  .cplay .stopsq { width:57px; height:57px; border-radius:12px; border:2px solid #fff; background:transparent; }
   .cmenu { top:98px; background:#3b4250; color:#dff2ff; font-size:19px; letter-spacing:.03em; }
   .cmenu:active { background:#4a5262; }
   #flick { position:absolute; inset:0; z-index:11; display:none; }
-  #flick .fi { position:absolute; width:150px; height:60px; border-radius:12px; display:flex; align-items:center;
-    justify-content:center; font-size:20px; font-weight:800; color:#fff; border:2px solid rgba(255,255,255,.25);
+  #flick .fi { position:absolute; width:105px; height:60px; border-radius:12px; display:flex; align-items:center;
+    justify-content:center; font-size:18px; font-weight:800; color:#fff; border:2px solid rgba(255,255,255,.25);
     background:#2b3140; box-shadow:0 6px 20px rgba(0,0,0,.5); }
   #flick .fi.hot { border-color:#fff; transform:scale(1.08); }
   .swatch { width:16px; height:16px; border-radius:4px; display:inline-block; margin-right:8px; vertical-align:-2px; }
@@ -235,17 +235,30 @@ const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
 let W=0, H=0, DPR=1;
 
+const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints>0);
+// 右上コントロール（▶/MENU）の位置。携帯は縦=少し下げ、横=少しセンター寄せ（島・時計との被り回避）
+function positionControls(){
+  const pb=document.getElementById("playBtn"), mb=document.getElementById("menuBtn");
+  if(!pb||!mb) return;
+  let top=14, right=14;
+  if(IS_TOUCH){ if(W<=H){ top=40; } else { right=36; } }
+  pb.style.top=top+"px"; pb.style.right=right+"px";
+  mb.style.top=(top+84)+"px"; mb.style.right=right+"px";
+}
 function resize(){
   DPR = Math.min(window.devicePixelRatio||1, 2);
-  W = window.innerWidth; H = window.innerHeight;
+  const vv=window.visualViewport;
+  W = Math.round(vv?vv.width:window.innerWidth); H = Math.round(vv?vv.height:window.innerHeight); // 実表示領域（下のグレー隙間対策）
   cv.width = W*DPR; cv.height = H*DPR;
   cv.style.width = W+"px"; cv.style.height = H+"px";
   ctx.setTransform(DPR,0,0,DPR,0,0);
+  positionControls();
 }
-window.addEventListener("resize", ()=>{ resize();
-  if(typeof isCreateMenuOpen==="function" && isCreateMenuOpen()) showCreateMenu(createMenu._sx, createMenu._sy); }); // 向き/幅変更で再最適化
-window.addEventListener("orientationchange", ()=>{ resize();
-  if(typeof isCreateMenuOpen==="function" && isCreateMenuOpen()) showCreateMenu(createMenu._sx, createMenu._sy); });
+function onViewportChange(){ resize();
+  if(typeof isCreateMenuOpen==="function" && isCreateMenuOpen()) showCreateMenu(createMenu._sx, createMenu._sy); } // 向き/幅変更で再最適化
+window.addEventListener("resize", onViewportChange);
+window.addEventListener("orientationchange", onViewportChange);
+if(window.visualViewport){ window.visualViewport.addEventListener("resize", onViewportChange); }
 resize();
 
 // ---- 座標変換 ----
@@ -475,7 +488,7 @@ function startPlay(){
   // 親子ローカル座標を確定（Play中の追従に使用）
   nodes.forEach(n=>{ if(isStage(n)&&n.parentNodeId&&nodeById(n.parentNodeId)) recomputeLocal(n); });
   document.getElementById("pad").style.display="none"; // D-PADは表示しない（STICK/BUTTONノードで操作）
-  const ph=document.getElementById("hint"); ph.textContent="矢印 / WASD で移動"; ph.classList.remove("hidden");
+  document.getElementById("hint").classList.add("hidden"); // Play中はヒント非表示
   document.getElementById("menuBtn").style.display="none"; // Play中はMENU非表示
   // ストップボタン＝角丸正方形の枠だけ（枠色はSettingのStopBtnCol、既定は白）
   const sN=nodes.find(n=>n.type==="setting"); const stopCol=(sN&&sN.stopBtnColor)||"#ffffff";
@@ -1055,8 +1068,8 @@ function drawPlay(){
   if(setN){ const wantTate=setN.orient==="tate", isLandscape=W>H;
     if((wantTate&&isLandscape)||(!wantTate&&!isLandscape)){
       ctx.fillStyle="rgba(0,0,0,.8)"; ctx.fillRect(0,0,W,H);
-      ctx.fillStyle="#fff"; ctx.font="800 26px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-      ctx.fillText(wantTate?"画面を縦にしてください":"画面を横にしてください", W/2, H/2);
+      ctx.fillStyle="#fff"; ctx.font="300 24px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(wantTate?"画面をタテにしてください":"画面をヨコにしてください", W/2, H/2);
     }
   }
 }
@@ -1172,21 +1185,22 @@ function onDown(sx,sy){
   if(isCreateMenuOpen()){ hideCreateMenu(); drag=null; return; }
   if(isMultiMenuOpen()){ hideMultiMenu(); drag=null; return; }
   pointerMoved=false;
-  // 上端の親端子からドラッグ → 親子接続（こちらも0.5秒armしてから開始）
-  const pp=hitParentPort(sx,sy);
-  if(pp){ drag={kind:"portpending", parent:pp, downSx:sx, downSy:sy, armed:false, dead:false, panVX:view.x, panVY:view.y, sx, sy};
-    cancelPortArm();
-    portArmTimer=setTimeout(()=>{ portArmTimer=null; if(drag&&drag.kind==="portpending"&&!drag.dead){ drag.armed=true; portCursor={show:true, x:drag.sx, y:drag.sy}; } }, 400);
-    return; }
-  const pt=hitPort(sx,sy);
-  if(pt){
-    // Unity版と同じ：端子に0.5秒触れてからドラッグ開始（それまではパン）。arm後にカーソル丸を表示。
-    drag={kind:"portpending", pt, downSx:sx, downSy:sy, armed:false, dead:false, panVX:view.x, panVY:view.y, sx, sy};
-    cancelPortArm();
-    portArmTimer=setTimeout(()=>{ portArmTimer=null; if(drag&&drag.kind==="portpending"&&!drag.dead){ drag.armed=true; portCursor={show:true, x:drag.sx, y:drag.sy}; } }, 400);
-    return;
-  }
+  // ノード本体を触っている時はノード操作（移動）を優先＝本体上では端子扱いにしない
   const hn=hitNode(sx,sy);
+  if(!hn){
+    // 本体外でのみ端子操作。上端の親端子（0.2秒armしてから開始）
+    const pp=hitParentPort(sx,sy);
+    if(pp){ drag={kind:"portpending", parent:pp, downSx:sx, downSy:sy, armed:false, dead:false, panVX:view.x, panVY:view.y, sx, sy};
+      cancelPortArm();
+      portArmTimer=setTimeout(()=>{ portArmTimer=null; if(drag&&drag.kind==="portpending"&&!drag.dead){ drag.armed=true; portCursor={show:true, x:drag.sx, y:drag.sy}; } }, 200);
+      return; }
+    const pt=hitPort(sx,sy);
+    if(pt){ drag={kind:"portpending", pt, downSx:sx, downSy:sy, armed:false, dead:false, panVX:view.x, panVY:view.y, sx, sy};
+      cancelPortArm();
+      portArmTimer=setTimeout(()=>{ portArmTimer=null; if(drag&&drag.kind==="portpending"&&!drag.dead){ drag.armed=true; portCursor={show:true, x:drag.sx, y:drag.sy}; } }, 200);
+      return;
+    }
+  }
   if(hn){
     if(multiSel.has(hn.node)){ // 複数選択をまとめて移動＋長押しメニュー
       recordUndo();
@@ -1332,7 +1346,6 @@ function playDown(pid,sx,sy){
     }
   }
 }
-const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints>0);
 // STICK/BUTTONの表示・当たり判定を隠すか（STYLE=OFF / VISIBLE=false / Hide on PC）
 function uiCtrlHidden(n){ if((n.style||"frame")==="off") return true; if(n.visible===false) return true;
   if(n.hideOnPc && !IS_TOUCH) return true;
@@ -1577,14 +1590,8 @@ function showCreateMenu(sx,sy){
     row.style.gridTemplateColumns=`repeat(${cols},1fr)`;
   }
   const mw=createMenu.offsetWidth||220, mh=createMenu.offsetHeight||180;
-  let left, top;
-  if(landscape){
-    left = W - mw - 12;                         // 画面右側に寄せる
-    top  = Math.max(10, Math.min(H-mh-6, sy-10));
-  } else {
-    left = 8;                                    // 縦画面：左の隙間なし（ほぼ全幅）
-    top  = 16;                                   // 画面上端付近
-  }
+  const left = landscape ? (W - mw - 12) : 8;      // 横=右寄せ / 縦=ほぼ全幅
+  const top  = Math.max(8, Math.round((H - mh)/2)); // 上下は常に画面中央
   createMenu.style.left=left+"px"; createMenu.style.top=top+"px";
 }
 function hideCreateMenu(){ createMenu.style.display="none"; createMenu._w=null; }
@@ -1777,10 +1784,15 @@ function refreshProp(){
     chkRow("Dynamics", ()=>n.dyn, v=>{ n.dyn=v; }); // 物理ON/OFFのみ（各パラメータはSettingで全体設定）
     selRow("Coord", [{value:"world",label:"World"},{value:"local",label:"Local"}], ()=>n.coordMode||"local", v=>{ n.coordMode=v; }); // 入力座標系
     chkRow("Visible", ()=>n.visible!==false, v=>{ n.visible=v; });
-    txtRow("Destroyed By", ()=>n.destroyedBy||"", v=>{ n.destroyedBy=v; }); // このタグの弾で破壊される
+  }
+  // Tag → Destroyed の順（SOUND以外の全オブジェクト＋SHOT＋TEXT）。DestroyedはNone or シーン内のTag一覧
+  if(d.object || n.type==="shot" || n.type==="text"){
+    txtRow("Tag", ()=>n.tag||"", v=>{ n.tag=v; refreshProp(); });
+    const tagSet=new Set(); nodes.forEach(m=>{ if(m.tag) tagSet.add(m.tag); });
+    const dOpts=[{value:"",label:"None"}, ...[...tagSet].map(t=>({value:t,label:t}))];
+    selRow("Destroyed", dOpts, ()=>n.destroyedBy||"", v=>{ n.destroyedBy=v; }); // このタグの弾で破壊される
   }
   if(hasGeom){
-    txtRow("Tag",   ()=>n.tag||"", v=>{ n.tag=v; });
     numRow("Layer", ()=>n.layer||50, v=>{ n.layer=Math.round(v); });
   }
   if(d.target){ // GETPOS / GETROT の対象オブジェクト
@@ -1841,26 +1853,34 @@ const FLICK_ITEMS=[
 let flickEls=[], flickHot=null;
 function openFlick(){
   flick.innerHTML=""; flickEls=[]; flickHot=null;
-  const bx=W-14-72, by=98; // MENUボタンの位置
-  // 先頭に Editor⇄Layout 切り替えを動的追加
   const modeItem = (mode==="layout")
     ? { label:"EDITOR", color:"#1f7a3a", run:()=>setMode("edit") }   // Editorテーマ=緑
     : { label:"LAYOUT", color:"#21b3d6", run:()=>setMode("layout") }; // Layoutテーマ=水色
   const items=[modeItem, ...FLICK_ITEMS];
-  // 2列に分割：SAVE/LOAD/NEW は左列、それ以外は右列（従来位置）
   const leftKeys=new Set(["save","load","new","setting"]);
   const rightCol = items.filter(it=>!leftKeys.has(it.key));
   const leftCol  = items.filter(it=> leftKeys.has(it.key));
+  // コントロールの現在位置に合わせて配置
+  const fw=105, gap=10, rowH=68, btn=72;
+  const r = IS_TOUCH ? (W<=H?14:36) : 14;
+  const t = IS_TOUCH ? (W<=H?40:14) : 14;
+  let col2X, col1X, startY;
+  if(W<=H){ // 縦画面：MENUボタンの下に表示
+    col2X = W - r - fw; col1X = col2X - fw - gap;
+    startY = t + 84 + btn + 8;
+  } else {   // 横画面：▶ボタンの左に表示
+    const playLeft = W - r - btn;
+    col2X = playLeft - fw - gap; col1X = col2X - fw - gap;
+    startY = t;
+  }
   const place=(list,colX)=>{ list.forEach((it,i)=>{
     const el=document.createElement("div"); el.className="fi"; el.textContent=it.label;
-    el.style.background=it.color;
-    el.style.left=colX+"px";
-    el.style.top =(by + i*68)+"px";
+    el.style.background=it.color; el.style.left=colX+"px"; el.style.top=(startY + i*rowH)+"px";
     el._it=it; flick.appendChild(el); flickEls.push(el);
     el.addEventListener("pointerup", ev=>{ ev.stopPropagation(); const run=it.run; closeFlick(false); run(); });
   }); };
-  place(rightCol, bx-165);        // 右列（MENUの左側）
-  place(leftCol,  bx-165-155);    // 左列（さらに左）
+  place(rightCol, col2X);
+  place(leftCol,  col1X);
   flick.style.display="block";
 }
 function updateFlick(sx,sy){

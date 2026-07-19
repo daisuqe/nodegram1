@@ -452,13 +452,20 @@ function outputValue(node, port, seen){
       return t.playAngle!=null?t.playAngle:(t.angle||0); }
     // その他（黄）
     case "velocity":{ return port===0 ? (node._ovx||0) : (node._ovy||0); }
-    case "contact": { const p=nodeById(node.parentNodeId); if(!p||destroyed.has(p.id)) return 0;
+    case "contact": { // SENSOR：自分の矩形領域に対象オブジェクトの一部でも触れたら1
+      const p=nodeById(node.parentNodeId); // 親がいれば無視対象＆基準。無くてもSensor単体で判定
+      if(p&&destroyed.has(p.id)) return 0;
+      // Sensorの判定領域（Rect固定）。play中はplayX/Y/Angle、無ければlayout位置
+      const sensor={ playX:(node.playX!=null?node.playX:(node.layoutX||0)), playY:(node.playY!=null?node.playY:(node.layoutY||0)),
+        playAngle:(node.playAngle!=null?node.playAngle:(node.angle||0)), w:node.w||60, h:node.h||60, type:"rect" };
       const tgt=node.contactTarget||"all";
-      for(const o of nodes){ if(o.id===p.id||destroyed.has(o.id)) continue;
-        if(tgt==="tag"){ if(!NODE_TYPES[o.type].object) continue; if((o.tag||"")!==(node.withTag||"")) continue; }
-        else if(tgt==="all"){ if(!NODE_TYPES[o.type].object) continue; }
-        else { if(o.type!==tgt) continue; } // rect/circle/character/shot
-        if(overlapAABB(p,o)) return 1; } return 0; }
+      for(const o of nodes){ if(destroyed.has(o.id)) continue; if(p&&o.id===p.id) continue; // 親自身は対象外
+        if(!NODE_TYPES[o.type].object) continue; // オブジェクト系のみ
+        if(tgt==="tag"){ if((o.tag||"")!==(node.withTag||"")) continue; }
+        else if(tgt!=="all"){ if(o.type!==tgt) continue; } // rect/circle/character/shot
+        // 一部でも重なれば反応（円は表面基準、矩形はOBB/AABBで正確に）
+        if(collideMTV(sensor,o)) return 1; }
+      return 0; }
     case "onbreak": return node.pulseBrk||0;
     case "screen":  return port===0 ? W : H; // 出力0=画面幅, 出力1=画面高さ
   }
@@ -472,6 +479,7 @@ function startPlay(){
   nodes.forEach(n=>{
     if(isStage(n)){ n.playX=n.layoutX||0; n.playY=n.layoutY||0; n.vx=0; n.vy=0; n.grounded=false; n._roll=0; n._prevJ=0; n._still=0; n._asleep=false; n._pushMag=0; n._groundMem=0; n._anchorX=null; n._anchorY=null; n._tiltTargetId=null; n._tilting=false;
       n.playAngle=n.angle||0; n._lastX=n.playX; n._lastY=n.playY; n._vx=0; n._vy=0; n._rawvx=0; n._rawvy=0; n._face=1; n._spin=0; }
+    if(attachesToObject(n)){ n.playX=n.layoutX||0; n.playY=n.layoutY||0; n.playAngle=n.angle||0; } // SENSOR等も判定用のplay位置を持つ
     if(n.type==="velocity"){ n._ovx=0; n._ovy=0; }
     if(n.type==="stick"){ n.stickX=0; n.stickY=0; n.stickPid=null; }
     if(n.type==="button"){ n.pressed=0; n.btnPid=null; }
@@ -488,7 +496,7 @@ function startPlay(){
   touchX=0; touchY=0; touchDown=0;
   try{ if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(_audioCtx.state==="suspended") _audioCtx.resume(); }catch(e){} // 実機の音声許可
   // 親子ローカル座標を確定（Play中の追従に使用）
-  nodes.forEach(n=>{ if(isStage(n)&&n.parentNodeId&&nodeById(n.parentNodeId)) recomputeLocal(n); });
+  nodes.forEach(n=>{ if((isStage(n)||attachesToObject(n))&&n.parentNodeId&&nodeById(n.parentNodeId)) recomputeLocal(n); });
   document.getElementById("pad").style.display="none"; // D-PADは表示しない（STICK/BUTTONノードで操作）
   document.getElementById("hint").classList.add("hidden"); // Play中はヒント非表示
   document.getElementById("menuBtn").style.display="none"; // Play中はMENU非表示
@@ -970,7 +978,7 @@ function directChildren(p){ return nodes.filter(c=>isStage(c)&&c.parentNodeId===
 function updateSubtreeWorld(p){ for(const c of directChildren(p)){ worldFromParent(c); updateSubtreeWorld(c); } }
 // Play中：親のplay変換（移動＋回転）で子のplay位置を決める
 function applyHierarchy(){
-  const kids = nodes.filter(n=>isStage(n) && n.parentNodeId && nodeById(n.parentNodeId));
+  const kids = nodes.filter(n=>(isStage(n)||attachesToObject(n)) && n.parentNodeId && nodeById(n.parentNodeId));
   kids.sort((a,b)=>stageDepth(a)-stageDepth(b));
   for(const n of kids){ const p=nodeById(n.parentNodeId);
     const pa=(p.playAngle!=null?p.playAngle:(p.angle||0));  // 親の現在角度で回転追従
@@ -1335,6 +1343,7 @@ function isNodeDblTap(id,sx,sy){ const now=performance.now();
   const dbl=(lastNodeTap.id===id)&&(now-lastNodeTap.t<350)&&Math.hypot(sx-lastNodeTap.x,sy-lastNodeTap.y)<30;
   lastNodeTap={id,t:now,x:sx,y:sy}; return dbl; }
 let pointerMoved=false;
+let lastPtr={x:0,y:0}; // 最新のポインタ画面座標（端スクロール判定用）
 
 function hitPort(sx,sy){
   const R = PORT_R*view.s + 18; // 指でも押しやすい判定
@@ -1384,7 +1393,7 @@ function hitLayoutObject(sx,sy){
 // 選択オブジェクトのハンドル判定
 function hitHandle(sx,sy){
   if(selected==null) return null;
-  const n=nodeById(selected); if(!n || !isStage(n)) return null;
+  const n=nodeById(selected); if(!n || !(isStage(n)||n.type==="contact")) return null; // SENSORもハンドル操作可
   const hp=handlePositions(n);
   if(Math.hypot(sx-hp.rot.x,sy-hp.rot.y)<HANDLE_R+8) return {kind:"rotate"};
   for(const c of hp.corners){ if(Math.hypot(sx-c.x,sy-c.y)<HANDLE_R+8) return {kind:"resize"}; }
@@ -1486,9 +1495,13 @@ function onDown(sx,sy){
   lpTimer=setTimeout(()=>{ lpTimer=null; drag=null; showCreateMenu(lpX,lpY); }, 450);
 }
 function onMove(sx,sy){
-  if(lpTimer && Math.hypot(sx-lpX,sy-lpY)>10) cancelLongPress();
+  lastPtr={x:sx,y:sy}; // 端スクロール用に最新位置を保持
+  // 少しでもドラッグ移動したら長押し(Property/メニュー)は発火させない
+  if(lpTimer && Math.hypot(sx-lpX,sy-lpY)>4) cancelLongPress();
   if(!drag) return;
   pointerMoved=true;
+  // 実際に移動を伴うドラッグ中は長押しを常にキャンセル（ゆっくり動かしてもPropertyを開かない）
+  if(lpTimer && (drag.kind==="node"||drag.kind==="nodegroup"||drag.kind==="layout"||drag.kind==="layoutgroup"||drag.kind==="resize"||drag.kind==="rotate")) cancelLongPress();
   if(drag.kind==="pan"){ view.x=drag.vx-(sx-drag.sx)/view.s; view.y=drag.vy-(sy-drag.sy)/view.s; }
   else if(drag.kind==="node"){ const wp=s2w(sx,sy); const n=nodeById(drag.node); if(n){ n.x=wp.x+drag.dx; n.y=wp.y+drag.dy; } }
   else if(drag.kind==="nodegroup"){ const wp=s2w(sx,sy); for(const it of drag.items){ const n=nodeById(it.id); if(n){ n.x=wp.x+it.dx; n.y=wp.y+it.dy; } } }
@@ -1995,7 +2008,11 @@ function refreshProp(){
   if(n.type==="contact"){ // SENSOR：ShapeはRect固定（プロパティ廃止）
     selRow("Target", [{value:"all",label:"ALL"},{value:"rect",label:"RECT"},{value:"circle",label:"CIRCLE"},{value:"character",label:"CHARA"},{value:"shot",label:"SHOT"},{value:"tag",label:"TAG"}],
       ()=>n.contactTarget||"all", v=>{ n.contactTarget=v; refreshProp(); });
-    if((n.contactTarget||"all")==="tag") txtRow("Tag", ()=>n.withTag||"", v=>{ n.withTag=v; });
+    if((n.contactTarget||"all")==="tag"){ // シーン内のタグをDDLで選択（EditTextではない）
+      const tagSet=new Set(); nodes.forEach(m=>{ if(m.tag) tagSet.add(m.tag); });
+      const tOpts=[{value:"",label:"None"}, ...[...tagSet].map(t=>({value:t,label:t}))];
+      selRow("Tag", tOpts, ()=>n.withTag||"", v=>{ n.withTag=v; });
+    }
   }
   if(n.type==="onbreak"){
     const tagSet=new Set(); nodes.forEach(m=>{ if(m.tag) tagSet.add(m.tag); });
@@ -2355,8 +2372,32 @@ sample();
 // =====================================================================
 let lastPropNode="__init__", lastMode="";
 let playAcc=0, autoAcc=0;
+// ドラッグ中にポインタが画面端へ来たらビューを自動スクロール（Edit/Layout）
+const EDGE_SCROLL_KINDS = new Set(["wire","parentwire","selbox","selboxL","node","nodegroup","layout","layoutgroup","resize","rotate"]);
+function edgeScroll(dt){
+  if(!drag) return;
+  let kind=drag.kind;
+  if(kind==="portpending"){ if(!drag.armed) return; } // arm前(パン判定中)はスクロールしない
+  else if(!EDGE_SCROLL_KINDS.has(kind)) return;
+  const margin=60;                          // 端からこの距離でスクロール開始
+  const maxSpeed=900;                        // 端での最大スクロール速度(px/秒, 画面座標)
+  const x=lastPtr.x, y=lastPtr.y;
+  let dx=0, dy=0;
+  if(x < margin)      dx = -(margin-x)/margin;
+  else if(x > W-margin) dx = (x-(W-margin))/margin;
+  if(y < margin)      dy = -(margin-y)/margin;
+  else if(y > H-margin) dy = (y-(H-margin))/margin;
+  if(dx===0 && dy===0) return;
+  const V = (mode==="layout") ? layoutView : view;
+  // 画面座標の移動量→ワールド量（ズーム補正）。ビューを動かす＝内容が逆向きに見えるので符号に注意
+  V.x += dx*maxSpeed*dt/V.s;
+  V.y += dy*maxSpeed*dt/V.s;
+  // ビューが動いた分、カーソル下のドラッグ対象を追従させる（同じ画面位置で onMove を再適用）
+  onMove(lastPtr.x, lastPtr.y);
+}
 function loop(t){
   const dt=Math.min(0.05,(t-lastT)/1000)||0; lastT=t;
+  if(mode==="edit"||mode==="layout") edgeScroll(dt);
   if(mode==="play"){
     const setN=nodes.find(n=>n.type==="setting"); const fps=setN?(setN.fps||60):60;
     playAcc+=dt; const step=1/fps;

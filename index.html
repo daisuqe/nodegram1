@@ -731,8 +731,10 @@ function playStep(dt){
     n._tilting=false;
     if(!isBall && bestSup){
       const cur=(n.playAngle!=null?n.playAngle:(n.angle||0));
+      // 支持面リスト。プリスキャンが空でも主支持面(bestSup)を必ず含める（reduceの空配列クラッシュ防止）
+      const supArr = supList.length ? supList : [{ang:bestSup.ang, sup:bestSup.sup, sx:n.playX}];
       // 各支持面へ「辺を合わせる」のに必要な回転量（90°対称で最寄り）を計算
-      const cand = supList.map(o=>{ let d=((o.ang-cur)%90+90)%90; if(d>45)d-=90; return {o, d, need:Math.abs(d)}; });
+      const cand = supArr.map(o=>{ let d=((o.ang-cur)%90+90)%90; if(d>45)d-=90; return {o, d, need:Math.abs(d)}; });
       const aligned = cand.some(c=>c.need<4); // どれかの斜面に既に辺が合っている
       let pick;
       if(aligned){ pick = cand.reduce((a,c)=>c.need<a.need?c:a); } // 合っている面を維持
@@ -740,7 +742,7 @@ function playStep(dt){
         // 目標面をコミット（未確定なら決定）。左右対称なら支持の強い側へ倒す
         if(n._tiltTargetId==null){
           // 倒す向き：中心より支持が強い側へ（対称なら+）
-          const left=supList.reduce((a,o)=>o.sx<n.playX-0.1?a+o.sup:a,0), right=supList.reduce((a,o)=>o.sx>n.playX+0.1?a+o.sup:a,0);
+          const left=supArr.reduce((a,o)=>o.sx<n.playX-0.1?a+o.sup:a,0), right=supArr.reduce((a,o)=>o.sx>n.playX+0.1?a+o.sup:a,0);
           const dir = (right>=left)?1:-1;
           // その向きに回して届く斜面のうち一番近いものを目標に
           let best=null; for(const c of cand){ if(Math.sign(c.d)===dir||c.d===0){ if(!best||c.need<best.need) best=c; } }

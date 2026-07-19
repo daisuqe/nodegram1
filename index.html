@@ -820,6 +820,8 @@ function playStep(dt){
 
   // 3) 親子構造：子は親の移動に追従（親→子の順で解決）
   applyHierarchy();
+  // キャラクターはいかなる場合も回転しない（全処理後に角度を確定）
+  for(const n of nodes){ if(n.type==="character") n.playAngle=n.angle||0; }
 
   // 4) SHOT：fire入力で弾を1発ずつ発射。BulletCount=画面内に同時に存在できる弾の最大数、Interval=連射間隔フレーム
   for(const n of nodes){ if(n.type!=="shot"||destroyed.has(n.id)) continue;
@@ -979,6 +981,7 @@ function applyHierarchy(){
     n.playX = p.playX + lx*Math.cos(a)-ly*Math.sin(a);
     n.playY = p.playY + lx*Math.sin(a)+ly*Math.cos(a);
     n.playAngle = pa + (n.la||0) + (n.type==="rotate"?(n._spin||0):0); // ROTATEは関節として自身の回転を加算
+    if(n.type==="character") n.playAngle=n.angle||0; // キャラクターは親に追従しても回転しない（常に直立）
   }
 }
 

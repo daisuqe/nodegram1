@@ -248,9 +248,12 @@ function positionControls(){
 function resize(){
   DPR = Math.min(window.devicePixelRatio||1, 2);
   const vv=window.visualViewport;
-  W = Math.round(vv?vv.width:window.innerWidth); H = Math.round(vv?vv.height:window.innerHeight); // 実表示領域（下のグレー隙間対策）
+  // 下の隙間対策：レイアウトビューポート(innerHeight, ツールバー裏まで含む)と視覚ビューポートの大きい方で画面いっぱいに
+  W = Math.round(Math.max(vv?vv.width:0, window.innerWidth, document.documentElement.clientWidth||0));
+  H = Math.round(Math.max(vv?vv.height:0, window.innerHeight, document.documentElement.clientHeight||0));
   cv.width = W*DPR; cv.height = H*DPR;
   cv.style.width = W+"px"; cv.style.height = H+"px";
+  cv.style.left="0px"; cv.style.top="0px";
   ctx.setTransform(DPR,0,0,DPR,0,0);
   positionControls();
 }
@@ -315,7 +318,7 @@ function addNode(type, wx, wy){
   if (type==="sound"){ n.tone=0; n.inst="piano"; n.volume=10; } // 音番号(0=ド)・楽器プリセット・音量
   if (type==="velocity"){ n.frames=5; }                        // 速度の平滑化フレーム数
   if (type==="bg"){ n.color="#0a0b10"; }                       // 背景色
-  if (type==="setting"){ n.gravity=9.8; n._gv=2; n.orient="yoko"; n.fps=60; n.dynamics=true; // Gravity表記9.8=旧1
+  if (type==="setting"){ n.gravity=9.8; n._gv=2; n.orient="any"; n.fps=60; n.dynamics=true; // Gravity表記9.8=旧1、向き既定Any
     n.setFriction=0.4; n.setBounce=0.0; n.setDrag=0.0; n.stopBtnColor="#ffffff"; } // 物理＋StopBtn色
   nodes.push(n);
   return n;
@@ -1509,7 +1512,7 @@ function drawPlay(){
   for(const n of uiList) drawStage(W/2+n.playX, H/2+n.playY, n, (n.playAngle!=null?n.playAngle:n.angle));
   // 画面向き警告（SETTINGでYOKO/TATE指定時）
   const setN=nodes.find(n=>n.type==="setting");
-  if(setN){ const wantTate=setN.orient==="tate", isLandscape=W>H;
+  if(setN && setN.orient && setN.orient!=="any"){ const wantTate=setN.orient==="tate", isLandscape=W>H; // Anyは向き不問でPlay可
     if((wantTate&&isLandscape)||(!wantTate&&!isLandscape)){
       ctx.fillStyle="rgba(0,0,0,.8)"; ctx.fillRect(0,0,W,H);
       ctx.fillStyle="#fff"; ctx.font="300 24px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
@@ -2232,7 +2235,7 @@ function refreshProp(){
   }
   if(n.type==="bg"){ colRow("Color", OBJ_COLORS, ()=>n.color||"#0a0b10", v=>{ n.color=v; }); }
   if(n.type==="setting"){
-    selRow("Screen", [{value:"yoko",label:"Yoko(横)"},{value:"tate",label:"Tate(縦)"}], ()=>n.orient||"yoko", v=>{ n.orient=v; }); // 一番上
+    selRow("Screen", [{value:"any",label:"Any"},{value:"tate",label:"Tate"},{value:"yoko",label:"Yoko"}], ()=>n.orient||"any", v=>{ n.orient=v; }); // 一番上（既定Any）
     numRow("FPS", ()=>n.fps||60, v=>{ n.fps=Math.max(10,Math.min(120,Math.round(v))); });
     chkRow("Dynamics", ()=>n.dynamics!==false, v=>{ n.dynamics=v; }); // 物理シミュレーション全体ON/OFF
     numRow("Gravity", ()=>n.gravity!=null?n.gravity:9.8, v=>{ n.gravity=Math.max(0,v); }, 0.1); // 9.8基準・小数OK

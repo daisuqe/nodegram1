@@ -169,7 +169,7 @@ const NODE_TYPES = {
   // その他（黄）  ※Unity: Texture 入力1(Visible)／Screen 入力X,Y,S 出力W,H／Velocity 出力X,Y
   texture:  { label:"TEXTURE",glyph:"TEX",  inputs:["V"],         outputs:[], color:"#e0c020", tex:true },
   contact:  { label:"SENSOR", glyph:"SEN",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
-  onbreak:  { label:"ONBREAK",glyph:"BRK",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
+  onbreak:  { label:"ONBREAK",glyph:"BRK",  inputs:["S"],         outputs:["="], color:"#e0c020", attach:true },
   rotate:   { label:"ROTATE", glyph:"ROT",  inputs:["av"],        outputs:[], color:"#e0c020", stage:"rotate" },
   velocity: { label:"VELOCITY",glyph:"VEL", inputs:[],            outputs:["X","Y"], color:"#e0c020", target:true },
   screen:   { label:"SCREEN", glyph:"SCR",  inputs:["X","Y","S"], outputs:["W","H"], color:"#e0c020" },
@@ -485,7 +485,7 @@ function startPlay(){
     if(n.type==="button"){ n.pressed=0; n.btnPid=null; }
     if(n.type==="shot"){ n._prevFire=0; n._shotCd=0; }
     if(n.type==="sound"){ n._prevPlay=0; stopTone(n); }
-    if(n.type==="onbreak"){ n.pulseBrk=0; }
+    if(n.type==="onbreak"){ n.pulseBrk=0; n._prevSig=0; }
     if(n.type==="counter") n.cnt=0;
     if(n.type==="var") n.store=(n.varInit||0);                 // 初期値を反映
     if(n.type==="array") n.arr=parseArrInit(n.arrInit);        // 初期値（, / 区切り）を反映
@@ -884,6 +884,12 @@ function playStep(dt){
       const matchTag = n.breakTag && (o.tag||"")===n.breakTag;
       const matchParent = n.parentNodeId===id;
       if(matchTag || matchParent){ cnt++; spawnBreakEffect(n, o); } }
+    // Signal入力：0→非0の立ち上がりで、壊れていなくてもONBREAK自身の位置・サイズでEffectを出す
+    const sig=inputValue(n,0);
+    if((n._prevSig||0)<=0 && sig>0){ cnt++;
+      const w=n.w||60, x=(n.playX!=null?n.playX:(n.layoutX||0)), y=(n.playY!=null?n.playY:(n.layoutY||0));
+      spawnBreakAt(n.breakEffect||"none", x, y, w, w, n.breakColor||"#ffffff"); } // 縦横同サイズ(正方形)
+    n._prevSig=sig;
     n.pulseBrk = cnt; }
   // エフェクト寿命
   for(let i=effects.length-1;i>=0;i--){ effects[i].t+=dt; if(effects[i].t>=effects[i].dur) effects.splice(i,1); }
@@ -934,6 +940,8 @@ function stopTone(n){ if(n&&n._osc){ try{ n._osc.stop(); }catch(e){} try{ n._osc
 // ONBREAK破壊エフェクトを発生（Unity版 BreakEffectUI の挙動を再現。重力なし・時間ベース）
 function spawnBreakEffect(n,o){ const type=n.breakEffect||"none"; if(type==="none") return;
   const x=o.playX||0, y=o.playY||0, w=o.w||40, h=o.h||40, color=n.breakColor||"#ffffff";
+  spawnBreakAt(type, x, y, w, h, color); }
+function spawnBreakAt(type, x, y, w, h, color){
   const radius=Math.min(w,h)*0.5;
   if(type==="particle"){ // 12個の四角が中心から均等に放射（サイズ固定、radius*3まで広がりフェード）
     const parts=[]; const cnt=12; for(let i=0;i<cnt;i++){ const a=i*Math.PI*2/cnt; parts.push({dx:Math.cos(a),dy:Math.sin(a)}); }
@@ -1246,7 +1254,7 @@ function drawStage(cx,cy,n,ang){
   } else if(attachesToObject(n)){ // SENSOR/ONBREAK/TEXTURE：レイアウト用のマーカー（Play中は非表示）
     if(mode!=="play"){ const R=Math.min(w,h)/2; const col=n.color||d.color;
       ctx.setLineDash([6,4]); ctx.strokeStyle=col; ctx.lineWidth=2.5;
-      if(n.type==="contact"){ ctx.strokeRect(-w/2,-h/2,w,h); } // SENSORはRect（矩形マーカー）
+      if(n.type==="contact"||n.type==="onbreak"){ ctx.strokeRect(-w/2,-h/2,w,h); } // SENSOR/ONBREAKは矩形マーカー(ONBREAKは正方形=エフェクト範囲)
       else { ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke(); }
       ctx.setLineDash([]);
       ctx.fillStyle=col; ctx.font=`800 ${Math.round(R*0.7)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
@@ -1403,7 +1411,7 @@ function hitLayoutObject(sx,sy){
 // 選択オブジェクトのハンドル判定
 function hitHandle(sx,sy){
   if(selected==null) return null;
-  const n=nodeById(selected); if(!n || !(isStage(n)||n.type==="contact")) return null; // SENSORもハンドル操作可
+  const n=nodeById(selected); if(!n || !(isStage(n)||n.type==="contact"||n.type==="onbreak")) return null; // SENSOR/ONBREAKもハンドル操作可
   const hp=handlePositions(n);
   if(Math.hypot(sx-hp.rot.x,sy-hp.rot.y)<HANDLE_R+8) return {kind:"rotate"};
   for(const c of hp.corners){ if(Math.hypot(sx-c.x,sy-c.y)<HANDLE_R+8) return {kind:"resize"}; }
@@ -1529,6 +1537,7 @@ function onMove(sx,sy){
   else if(drag.kind==="layoutpan"){ layoutView.x=drag.vx-(sx-drag.sx)/layoutView.s; layoutView.y=drag.vy-(sy-drag.sy)/layoutView.s; }
   else if(drag.kind==="resize"){ const n=nodeById(drag.node); if(n){ const l=objToLocal(n,sx,sy);
     if(n.type==="circle"){ const r=Math.max(8,Math.round(Math.hypot(l.x,l.y))); n.w=r*2; n.h=r*2; } // 真円：縦横同時
+    else if(n.type==="onbreak"){ const s=Math.max(16,Math.round(Math.max(Math.abs(l.x),Math.abs(l.y))*2)); n.w=s; n.h=s; } // ONBREAK：正方形
     else { n.w=Math.max(16,Math.round(Math.abs(l.x)*2)); n.h=Math.max(16,Math.round(Math.abs(l.y)*2)); } } }
   else if(drag.kind==="rotate"){ const n=nodeById(drag.node); if(n){ const c=objCenter(n);
     const raw=Math.atan2(sy-c.y,sx-c.x)*180/Math.PI + 90;
@@ -2334,7 +2343,7 @@ function deserialize(s){ const o=JSON.parse(s); nodes=o.nodes||[]; conns=o.conns
       if(n.gravity==null)n.gravity=9.8; else if(n.gravity>50)n.gravity=n.gravity/2000;
       if(n._gv!==2){ n.gravity=(n.gravity||1)*9.8; n._gv=2; } } // 旧倍率→9.8表示へ一度だけ変換
     if(n.type==="contact"){ if(n.contactTarget==null)n.contactTarget="all"; n.contactShape="rect"; } // SENSOR: Rect固定
-    if(n.type==="onbreak"){ if(n.breakColor==null)n.breakColor="#ffffff"; if(n.breakEffect==null)n.breakEffect="none"; if(n.breakTag==null)n.breakTag=""; }
+    if(n.type==="onbreak"){ if(n.breakColor==null)n.breakColor="#ffffff"; if(n.breakEffect==null)n.breakEffect="none"; if(n.breakTag==null)n.breakTag=""; n.h=n.w=(n.w||60); } // 正方形
     if(n.type==="text"&&n.outline==null) n.outline=false;
     if(n.type==="shot"){ if(n.bulletCount==null)n.bulletCount=1; if(n.bulletInterval==null)n.bulletInterval=0;
       if(n.size==null)n.size=(n.bulletSize||28); if(n.bulletShape==null)n.bulletShape="circle"; }

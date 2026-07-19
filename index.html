@@ -67,6 +67,8 @@
   #multiMenu .mi:active { filter:brightness(1.2); }
 
   /* プロパティパネル（選択ノード） */
+  /* 背後のPlayボタン等を触れないようにするための透明バックドロップ（タップで閉じる） */
+  #propBackdrop { position:absolute; inset:0; z-index:14; display:none; background:transparent; }
   #propPanel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:15;
     background:rgba(28,32,42,.98); border:1px solid #3a4150; border-radius:14px; padding:16px 18px; display:none;
     min-width:240px; max-width:calc(100vw - 20px); box-shadow:0 12px 36px rgba(0,0,0,.6); }
@@ -106,6 +108,7 @@
 
   <div id="createMenu"></div>
   <div id="multiMenu"></div>
+  <div id="propBackdrop"></div>
   <div id="propPanel"></div>
 
   <!-- テクスチャエディタのツール（左に縦並び）＋右上に閉じる -->
@@ -165,7 +168,7 @@ const NODE_TYPES = {
   sound:    { label:"SOUND",  glyph:"SND",  inputs:["T","S"],     outputs:[], color:"#8a3bd0" },
   // その他（黄）  ※Unity: Texture 入力1(Visible)／Screen 入力X,Y,S 出力W,H／Velocity 出力X,Y
   texture:  { label:"TEXTURE",glyph:"TEX",  inputs:["V"],         outputs:[], color:"#e0c020", tex:true },
-  contact:  { label:"CONTACT",glyph:"CON",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
+  contact:  { label:"SENSOR", glyph:"SEN",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
   onbreak:  { label:"ONBREAK",glyph:"BRK",  inputs:[],            outputs:["="], color:"#e0c020", attach:true },
   rotate:   { label:"ROTATE", glyph:"ROT",  inputs:["av"],        outputs:[], color:"#e0c020", stage:"rotate" },
   velocity: { label:"VELOCITY",glyph:"VEL", inputs:[],            outputs:["X","Y"], color:"#e0c020", target:true },
@@ -294,7 +297,7 @@ function addNode(type, wx, wy){
   }
   if (d.tex){ n.texW=16; n.texH=16; n.pixels=new Array(16*16).fill(null); n.parentNodeId=null; }
   if (d.attach){ n.parentNodeId=null;
-    if(type==="contact"){ n.withTag=""; n.contactTarget="all"; n.contactShape="rect"; } // Unity: Target/Shape/Tag
+    if(type==="contact"){ n.withTag=""; n.contactTarget="all"; n.contactShape="rect"; } // SENSOR: Target/Tag（ShapeはRect固定）
     if(type==="onbreak"){ n.breakColor="#ffffff"; n.breakEffect="none"; n.breakTag=""; } } // Unity: Color/Effect/Tag
   // CONTACT/ONBREAK/TEXTURE もレイアウトで配置できるよう位置とサイズを持たせる
   if (attachesToObject(n)){ n.w=n.w||60; n.h=n.h||60; n.angle=n.angle||0;
@@ -1222,9 +1225,12 @@ function drawStage(cx,cy,n,ang){
     if(mode!=="play"){ const R=Math.min(w,h)/2; ctx.strokeStyle=n.color; ctx.lineWidth=3;
       ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-R,0); ctx.lineTo(R,0); ctx.moveTo(0,-R); ctx.lineTo(0,R); ctx.stroke(); }
-  } else if(attachesToObject(n)){ // CONTACT/ONBREAK/TEXTURE：レイアウト用のマーカー（Play中は非表示）
+  } else if(attachesToObject(n)){ // SENSOR/ONBREAK/TEXTURE：レイアウト用のマーカー（Play中は非表示）
     if(mode!=="play"){ const R=Math.min(w,h)/2; const col=n.color||d.color;
-      ctx.setLineDash([6,4]); ctx.strokeStyle=col; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.setLineDash([6,4]); ctx.strokeStyle=col; ctx.lineWidth=2.5;
+      if(n.type==="contact"){ ctx.strokeRect(-w/2,-h/2,w,h); } // SENSORはRect（矩形マーカー）
+      else { ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke(); }
+      ctx.setLineDash([]);
       ctx.fillStyle=col; ctx.font=`800 ${Math.round(R*0.7)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText(nodeGlyph(n), 0, 0); }
   }
@@ -1243,8 +1249,9 @@ function drawLayout(){
   // 中央十字ガイド
   ctx.strokeStyle="#2a313d"; ctx.lineWidth=1/S;
   ctx.beginPath(); ctx.moveTo(0,-H/2); ctx.lineTo(0,H/2); ctx.moveTo(-W/2,0); ctx.lineTo(W/2,0); ctx.stroke();
-  // ステージ要素＋付随ノード（ステージ座標で描画）
-  for(const n of nodes){ if(!showsInLayout(n)) continue; drawStage(n.layoutX||0, n.layoutY||0, n); }
+  // ステージ要素＋付随ノード（ステージ座標で描画）。Layer昇順で描画（Play画面と同じ表示順）
+  const layoutList = nodes.filter(showsInLayout).slice().sort((a,b)=>(a.layer||50)-(b.layer||50));
+  for(const n of layoutList){ drawStage(n.layoutX||0, n.layoutY||0, n); }
   ctx.restore();
   // 複数選択のアウトライン＆ハンドル（スクリーン空間）
   for(const n of nodes){ if(!showsInLayout(n)) continue;
@@ -1364,10 +1371,11 @@ function cancelLongPress(){ if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; } 
 let portArmTimer=null;
 function cancelPortArm(){ if(portArmTimer){ clearTimeout(portArmTimer); portArmTimer=null; } }
 
-// レイアウト画面：オブジェクトの当たり判定（回転考慮）
+// レイアウト画面：オブジェクトの当たり判定（回転考慮）。上に描かれる(Layer大)ものを優先選択
 function hitLayoutObject(sx,sy){
-  for(let i=nodes.length-1;i>=0;i--){ const n=nodes[i];
-    if(!showsInLayout(n)) continue;
+  const list=nodes.filter(showsInLayout).slice()
+    .sort((a,b)=>((b.layer||50)-(a.layer||50)) || (nodes.indexOf(b)-nodes.indexOf(a))); // Layer降順→後勝ち
+  for(const n of list){
     const l=objToLocal(n,sx,sy);
     if(Math.abs(l.x)<=(n.w||80)/2 && Math.abs(l.y)<=(n.h||80)/2) return n;
   }
@@ -1860,10 +1868,14 @@ function isMultiMenuOpen(){ return multiMenu.style.display==="block"; }
 // プロパティパネル（ノード長押しで表示・編集・削除）
 let propNode=null; // Property を表示中のノードID（長押しで設定）
 const propPanel=document.getElementById("propPanel");
+const propBackdrop=document.getElementById("propBackdrop");
+// バックドロップ（プロパティ表示中の背後）をタップしたらパネルを閉じる
+propBackdrop.addEventListener("pointerdown",(e)=>{ e.stopPropagation(); e.preventDefault(); propNode=null; refreshProp(); });
 function openProp(id){ propNode=id; refreshProp(); }
 function refreshProp(){
   const n = (propNode!=null) ? nodeById(propNode) : null;
-  if(!n || (mode!=="edit" && mode!=="layout")){ propPanel.style.display="none"; return; }
+  if(!n || (mode!=="edit" && mode!=="layout")){ propPanel.style.display="none"; propBackdrop.style.display="none"; return; }
+  propBackdrop.style.display="block"; // 背後をブロック＆外タップで閉じる
   const d=NODE_TYPES[n.type];
   propPanel.innerHTML="";
   const t=document.createElement("div"); t.className="pt";
@@ -1980,11 +1992,10 @@ function refreshProp(){
     selRow("Wave", [{value:"square",label:"Square"},{value:"sine",label:"Sine"},{value:"triangle",label:"Triangle"},{value:"sawtooth",label:"Saw"}], ()=>n.wave||"square", v=>{ n.wave=v; });
     numRow("Volume", ()=>n.volume!=null?n.volume:10, v=>{ n.volume=Math.max(0,Math.min(20,v)); }); } // 0〜20, 既定10
   if(n.type==="velocity"){ numRow("Frames", ()=>n.frames||5, v=>{ n.frames=Math.max(1,Math.round(v)); }); }
-  if(n.type==="contact"){
+  if(n.type==="contact"){ // SENSOR：ShapeはRect固定（プロパティ廃止）
     selRow("Target", [{value:"all",label:"ALL"},{value:"rect",label:"RECT"},{value:"circle",label:"CIRCLE"},{value:"character",label:"CHARA"},{value:"shot",label:"SHOT"},{value:"tag",label:"TAG"}],
       ()=>n.contactTarget||"all", v=>{ n.contactTarget=v; refreshProp(); });
     if((n.contactTarget||"all")==="tag") txtRow("Tag", ()=>n.withTag||"", v=>{ n.withTag=v; });
-    selRow("Shape", [{value:"rect",label:"RECT"},{value:"circle",label:"CIRCLE"}], ()=>n.contactShape||"rect", v=>{ n.contactShape=v; });
   }
   if(n.type==="onbreak"){
     const tagSet=new Set(); nodes.forEach(m=>{ if(m.tag) tagSet.add(m.tag); });
@@ -2295,7 +2306,7 @@ function deserialize(s){ const o=JSON.parse(s); nodes=o.nodes||[]; conns=o.conns
     if(n.type==="setting"){ if(n.dynamics==null)n.dynamics=true; if(n.setFriction==null)n.setFriction=0.4; if(n.setBounce==null)n.setBounce=0.0; if(n.setDrag==null)n.setDrag=0.0; if(n.stopBtnColor==null)n.stopBtnColor="#ffffff";
       if(n.gravity==null)n.gravity=9.8; else if(n.gravity>50)n.gravity=n.gravity/2000;
       if(n._gv!==2){ n.gravity=(n.gravity||1)*9.8; n._gv=2; } } // 旧倍率→9.8表示へ一度だけ変換
-    if(n.type==="contact"){ if(n.contactTarget==null)n.contactTarget="all"; if(n.contactShape==null)n.contactShape="rect"; }
+    if(n.type==="contact"){ if(n.contactTarget==null)n.contactTarget="all"; n.contactShape="rect"; } // SENSOR: Rect固定
     if(n.type==="onbreak"){ if(n.breakColor==null)n.breakColor="#ffffff"; if(n.breakEffect==null)n.breakEffect="none"; if(n.breakTag==null)n.breakTag=""; }
     if(n.type==="text"&&n.outline==null) n.outline=false;
     if(n.type==="shot"){ if(n.bulletCount==null)n.bulletCount=1; if(n.bulletInterval==null)n.bulletInterval=0;

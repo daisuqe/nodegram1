@@ -2388,11 +2388,11 @@ const FLICK_ITEMS=[
   { key:"newnode", label:"NEW NODE", color:"#2f5a8a", run:()=>{ if(mode==="edit"||mode==="layout") showCreateMenu(W/2, Math.max(120,H*0.4)); } },
   { key:"save", label:"SAVE", color:"#c0392b", run:()=>openSaveDialog() },
   { key:"load", label:"LOAD", color:"#2b6fd0", run:()=>openLoadDialog() },
-  { key:"undo", label:"UNDO", color:"#6b5bd0", run:()=>undo() },
-  { key:"redo", label:"REDO", color:"#6b5bd0", run:()=>redo() },
+  { key:"undo", label:"UNDO", color:"#8a55c0", run:()=>undo() }, // 赤寄りの紫
+  { key:"redo", label:"REDO", color:"#5560d0", run:()=>redo() }, // 青寄りの紫
   { key:"fit",  label:"FIT",  color:"#1f7a3a", run:fitView },
   { key:"new",  label:"NEW",  color:"#555b68", run:doNew },
-  { key:"setting", label:"SETTING", color:"#8a6d3b", run:()=>openAppSettings() },
+  { key:"setting", label:"SETTING", color:"#c99a3f", run:()=>openAppSettings() }, // 彩度を上げ明るく
 ];
 let flickEls=[], flickHot=null;
 function openFlick(){

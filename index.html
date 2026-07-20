@@ -175,7 +175,7 @@ const NODE_TYPES = {
   getrot: { label:"GETROT",  glyph:"GRot", inputs:[],             outputs:["R"],     color:"#22b8c0" },
   // 出力系（紫）  ※Unity: Text 入力T,V／Rect/Circle 入力X,Y,V／Character 入力X,Y,J／Shot 入力1／Sound 入力T,S
   text:     { label:"TEXT",   glyph:"T",    inputs:["T","V"],       outputs:[], color:"#8a3bd0", stage:"text"   },
-  rect:     { label:"RECT",   glyph:"■",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"rect"  },
+  rect:     { label:"RECT",   glyph:"□",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"rect"  },
   circle:   { label:"CIRCLE", glyph:"〇",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"circle"},
   character:{ label:"CHARACTER", glyph:"CHR", inputs:["X","Y","J"], outputs:[], color:"#8a3bd0", object:"rect"  },
   shot:     { label:"SHOT",   glyph:"SHOT", inputs:["fire"],      outputs:[], color:"#8a3bd0", stage:"shot"   },
@@ -218,7 +218,7 @@ function nodeHeight(t){ return NS; }
 // ノードに表示する1〜3文字（元nodegramのシンボル表示に対応）
 const CMP_GLYPH={eq:"＝",gt:"＞",lt:"＜",ne:"≠",ge:"≧",le:"≦"};
 // ノード表記の明示指定（先頭以外小文字ルールの例外）
-const GLYPH_OVERRIDE={ getpos:"GPos", getrot:"GRot", stick:"Stk", character:"★", shot:"▲", arctan:"PtA", angletopos:"AtP",
+const GLYPH_OVERRIDE={ getpos:"GPos", getrot:"GRot", stick:"Stk", character:"★", shot:"△", arctan:"PtA", angletopos:"AtP",
   trigger:"Trig", text:"Text", sound:"Sund", counter:"Cunt", bg:"BG" };
 function nodeGlyph(n){
   if(n.type==="const") return String(n.value);
@@ -231,7 +231,18 @@ function nodeGlyph(n){
 }
 function glyphFontSize(g){ const L=[...String(g)].length;
   if(g==="Stk") return 0.58*NS; // STICK: 3文字だが大きめ
-  return (L<=1?0.84 : L===2?0.62 : L===3?0.48 : 0.36) * NS; } // 約1.4倍に拡大（★▲■〇は1文字=0.84）
+  return (L<=1?0.84 : L===2?0.62 : L===3?0.48 : 0.36) * NS; } // 約1.4倍に拡大（★は1文字=0.84）
+// ○□△ を同じ太さの線で描画（半径r、中心cx,cy）。影付き白線
+function drawShapeGlyph(g, cx, cy, r){
+  const lw=Math.max(1.5, r*0.34); // 〇と揃える線幅
+  const paint=(dx,dy,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.lineJoin="round"; ctx.beginPath();
+    if(g==="〇"){ ctx.arc(cx+dx,cy+dy,r,0,7); }
+    else if(g==="□"){ ctx.rect(cx+dx-r,cy+dy-r,r*2,r*2); }
+    else { const R=r*1.15, oy=R*0.13; // 重心を中心へ（少し下げてバランス）
+      ctx.moveTo(cx+dx, cy+dy-R+oy); ctx.lineTo(cx+dx+R*0.87, cy+dy+R*0.5+oy); ctx.lineTo(cx+dx-R*0.87, cy+dy+R*0.5+oy); ctx.closePath(); }
+    ctx.stroke(); };
+  paint(1.5,1.5,"rgba(0,0,0,.4)"); paint(0,0,"#ffffff");
+}
 
 // ---- 状態 ----
 let nodes = [];              // {id,type,x,y,value,color,size,playX,playY,vx,vy}
@@ -1299,10 +1310,13 @@ function drawNode(n){
   // 中央のシンボル（1〜3文字）をノードいっぱいに
   const g=nodeGlyph(n);
   const cx=tl.x+w/2, cy=tl.y+hh/2;
-  ctx.font=`800 ${Math.round(glyphFontSize(g)*view.s)}px sans-serif`;
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillStyle="rgba(0,0,0,.4)"; ctx.fillText(g, cx+1.5, cy+1.5);
-  ctx.fillStyle="#ffffff";        ctx.fillText(g, cx, cy);
+  if(g==="〇"||g==="□"||g==="△"){ drawShapeGlyph(g, cx, cy, 0.36*NS*view.s); } // 図形は同じ太さの線で描画（9割サイズ）
+  else {
+    ctx.font=`800 ${Math.round(glyphFontSize(g)*view.s)}px sans-serif`;
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle="rgba(0,0,0,.4)"; ctx.fillText(g, cx+1.5, cy+1.5);
+    ctx.fillStyle="#ffffff";        ctx.fillText(g, cx, cy);
+  }
   // 選択中は端子ラベルをノードの外側に表示
   if(selected===n.id){
     ctx.font=`${Math.round(48*view.s)}px sans-serif`; // 端子ラベル3倍（太字にしない）

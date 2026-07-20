@@ -70,7 +70,8 @@
 
   /* プロパティパネル（選択ノード） */
   /* 背後のPlayボタン等を触れないようにするための透明バックドロップ（タップで閉じる） */
-  #propBackdrop { position:absolute; inset:0; z-index:14; display:none; background:transparent; }
+  #propBackdrop { position:absolute; inset:0; z-index:14; display:none; background:rgba(0,0,0,.55); }
+  #menuBackdrop { position:absolute; inset:0; z-index:19; display:none; background:rgba(0,0,0,.55); } /* CreateNode/Multiメニューの暗転 */
   #propPanel { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:15;
     background:rgba(28,32,42,.98); border:1px solid #3a4150; border-radius:14px; padding:16px 18px; display:none;
     min-width:240px; max-width:calc(100vw - 20px); box-shadow:0 12px 36px rgba(0,0,0,.6); }
@@ -79,12 +80,14 @@
   .pclose { margin-left:auto; width:44px; height:44px; border-radius:8px; border:1px solid #2a91ad;
     background:#21b3d6; color:#fff; font-size:40px; font-weight:800; cursor:pointer; line-height:1; }
   .pclose:active { background:#1a94b3; }
+  /* ラベルは左半分固定、コントロールは右半分(50%上限)。入力欄の左位置を揃える */
   #propPanel .prow { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-  #propPanel label { color:#9aa3b5; font-size:16px; font-weight:700; }
-  #propPanel input { flex:1; width:110px; height:44px; border-radius:9px; border:1px solid #3a4150; background:#181c26;
+  #propPanel label { color:#9aa3b5; font-size:16px; font-weight:700; flex:0 0 46%; min-width:0; }
+  #propPanel input { flex:0 0 50%; width:50%; max-width:50%; box-sizing:border-box; height:44px; border-radius:9px; border:1px solid #3a4150; background:#181c26;
     color:#e6e9ef; font-size:18px; font-weight:700; text-align:center; }
-  #propPanel input[type=checkbox] { flex:0 0 auto; width:32px; height:32px; }
-  #propPanel select { flex:1; height:44px; border-radius:9px; border:1px solid #3a4150; background:#181c26;
+  #propPanel input[type=checkbox] { flex:0 0 auto; width:32px; height:32px; max-width:none; }
+  /* DDLは50%上限だが中身が入りきらない場合は超えてよい */
+  #propPanel select { flex:0 1 auto; min-width:50%; max-width:100%; height:44px; border-radius:9px; border:1px solid #3a4150; background:#181c26;
     color:#e6e9ef; font-size:16px; font-weight:700; }
   #propPanel .del { width:100%; height:48px; border-radius:10px; border:1px solid #cc3b3b; background:#a12b2b;
     color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
@@ -108,6 +111,7 @@
   </div>
   <div id="hint" class="hidden">矢印 / WASD で移動</div>
 
+  <div id="menuBackdrop"></div>
   <div id="createMenu"></div>
   <div id="multiMenu"></div>
   <div id="propBackdrop"></div>
@@ -171,7 +175,7 @@ const NODE_TYPES = {
   getrot: { label:"GETROT",  glyph:"GRot", inputs:[],             outputs:["R"],     color:"#22b8c0" },
   // 出力系（紫）  ※Unity: Text 入力T,V／Rect/Circle 入力X,Y,V／Character 入力X,Y,J／Shot 入力1／Sound 入力T,S
   text:     { label:"TEXT",   glyph:"T",    inputs:["T","V"],       outputs:[], color:"#8a3bd0", stage:"text"   },
-  rect:     { label:"RECT",   glyph:"▭",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"rect"  },
+  rect:     { label:"RECT",   glyph:"■",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"rect"  },
   circle:   { label:"CIRCLE", glyph:"〇",   inputs:["X","Y","V"],   outputs:[], color:"#8a3bd0", object:"circle"},
   character:{ label:"CHARACTER", glyph:"CHR", inputs:["X","Y","J"], outputs:[], color:"#8a3bd0", object:"rect"  },
   shot:     { label:"SHOT",   glyph:"SHOT", inputs:["fire"],      outputs:[], color:"#8a3bd0", stage:"shot"   },
@@ -214,7 +218,7 @@ function nodeHeight(t){ return NS; }
 // ノードに表示する1〜3文字（元nodegramのシンボル表示に対応）
 const CMP_GLYPH={eq:"＝",gt:"＞",lt:"＜",ne:"≠",ge:"≧",le:"≦"};
 // ノード表記の明示指定（先頭以外小文字ルールの例外）
-const GLYPH_OVERRIDE={ getpos:"GPos", getrot:"GRot", stick:"Stic", arctan:"PtA", angletopos:"AtP",
+const GLYPH_OVERRIDE={ getpos:"GPos", getrot:"GRot", stick:"Stk", character:"★", shot:"▲", arctan:"PtA", angletopos:"AtP",
   trigger:"Trig", text:"Text", sound:"Sund", counter:"Cunt", bg:"BG" };
 function nodeGlyph(n){
   if(n.type==="const") return String(n.value);
@@ -226,7 +230,8 @@ function nodeGlyph(n){
   return g;
 }
 function glyphFontSize(g){ const L=[...String(g)].length;
-  return (L<=1?0.84 : L===2?0.62 : L===3?0.48 : 0.36) * NS; } // 約1.4倍に拡大
+  if(g==="Stk") return 0.58*NS; // STICK: 3文字だが大きめ
+  return (L<=1?0.84 : L===2?0.62 : L===3?0.48 : 0.36) * NS; } // 約1.4倍に拡大（★▲■〇は1文字=0.84）
 
 // ---- 状態 ----
 let nodes = [];              // {id,type,x,y,value,color,size,playX,playY,vx,vy}
@@ -565,7 +570,10 @@ const MTR = window.Matter; // インライン内包
 const M_STEP = 1000/60, M_DT = 1/60;    // 固定タイムステップ
 let mEngine=null, mBodyOf={};           // node.id -> Matter body
 function mNodeShapeKey(n){ return NODE_TYPES[n.type].object==="circle" ? "c" : "r"; } // 形状変化検出用
-function mBodyType(n){ return n.bodyType || (n.type==="character"?"dynamic":"static"); }
+function mBodyType(n){
+  const setN=nodes.find(m=>m.type==="setting");
+  if(setN && setN.dynamics===false) return "off"; // Settingで物理OFF＝シーン全体が物理なし（パズル等）
+  return n.bodyType || (n.type==="character"?"dynamic":"static"); }
 function mBuildWorld(){
   mEngine = MTR.Engine.create({ enableSleeping:true, positionIterations:10, velocityIterations:8 });
   mEngine.world.gravity.y = 1; // scaleは毎フレーム設定
@@ -759,7 +767,7 @@ function playStep(dt){
   for(const n of live){ const body=mBodyOf[n.id]; if(!body) continue; const type=bt(n);
     // Matterの摩擦/反発/空気抵抗をSettingに追従（実行中の変更にも対応）
     body.friction=S_FRIC2; body.frictionStatic=S_FRIC2; body.restitution=S_BOUNCE2; body.frictionAir=S_DRAG2;
-    const kc = n.type==="character"?100:1; // CHARACTERのX,Y入力は内部で100倍
+    const kc = n.type==="character"?200:1; // CHARACTERのX,Y入力は内部で200倍(移動量2倍)
     const hasXin = conns.some(c=>c.b===n.id&&c.bi===0);
     const hasYin = conns.some(c=>c.b===n.id&&c.bi===1);
     if(type==="static"){ // 不動。位置はlayout固定
@@ -808,7 +816,7 @@ function playStep(dt){
 
   // OFFのオブジェクトは物理演算しないが、X/Y入力があれば移動する（シューティング自機など）
   for(const n of objs){ if(destroyed.has(n.id) || mBodyType(n)!=="off") continue;
-    const kc = n.type==="character"?100:1;
+    const kc = n.type==="character"?200:1;
     const hasXin=conns.some(c=>c.b===n.id&&c.bi===0), hasYin=conns.some(c=>c.b===n.id&&c.bi===1);
     const vx=hasXin?inputValue(n,0)*kc:0, vy=hasYin?inputValue(n,1)*kc:0;
     n.playX=(n.playX||n.layoutX||0)+vx*dt; n.playY=(n.playY||n.layoutY||0)+vy*dt;
@@ -835,7 +843,7 @@ function playStep(dt){
       const a=((n.playAngle!=null?n.playAngle:n.angle)-90)*Math.PI/180;
       const bsize=((n.w||70)+(n.h||70))/2; // 弾サイズ＝発射口の幅と高さの平均（楕円/長方形にしない）
       bullets.push({ x:n.playX, y:n.playY, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd, shotId:n.id,
-        tag:n.tag||"", size:bsize, shape:n.bulletShape||"circle", color:n.bulletColor||"#ffe08a" });
+        tag:n.tag||"", size:bsize, shape:n.bulletShape||"circle", color:n.bulletColor||"#ffe08a", dyn:!!n.bulletDynamic });
       if(interval>0) n._shotCd=interval;
     }
     n._prevFire=fire;
@@ -843,6 +851,7 @@ function playStep(dt){
   brokenThisFrame=new Set();
   const cx0=playCam.x, cy0=playCam.y;
   for(let i=bullets.length-1;i>=0;i--){ const b=bullets[i];
+    if(b.dyn) b.vy += G*dt; // Dynamic弾は重力の影響を受ける
     b.x+=b.vx*dt; b.y+=b.vy*dt;
     let hitObj=false;
     if(b.tag){ // タグ一致 or DestroyedBy一致のオブジェクトを破壊
@@ -2070,7 +2079,7 @@ const createMenu=document.getElementById("createMenu");
 })();
 function showCreateMenu(sx,sy){
   createMenu._w=s2w(sx,sy); createMenu._sx=sx; createMenu._sy=sy;
-  createMenu.style.display="block";
+  createMenu.style.display="block"; updateMenuBackdrop();
   const landscape = W>H;
   const row=createMenu.querySelector(".row");
   if(landscape){
@@ -2092,7 +2101,10 @@ function showCreateMenu(sx,sy){
   const top  = Math.max(8, Math.round((H - mh)/2)); // 上下は常に画面中央
   createMenu.style.left=left+"px"; createMenu.style.top=top+"px";
 }
-function hideCreateMenu(){ createMenu.style.display="none"; createMenu._w=null; }
+function hideCreateMenu(){ createMenu.style.display="none"; createMenu._w=null; updateMenuBackdrop(); }
+function updateMenuBackdrop(){ const bd=document.getElementById("menuBackdrop"); if(!bd) return;
+  const open = createMenu.style.display==="block" || document.getElementById("multiMenu").style.display==="block";
+  bd.style.display = open?"block":"none"; }
 function isCreateMenuOpen(){ return createMenu.style.display==="block"; }
 
 // 複数選択メニュー（Duplicate / Delete）
@@ -2105,12 +2117,12 @@ const multiMenu=document.getElementById("multiMenu");
   multiMenu.appendChild(dup); multiMenu.appendChild(del);
 })();
 function showMultiMenu(sx,sy){
-  multiMenu.style.display="block";
+  multiMenu.style.display="block"; updateMenuBackdrop();
   const mw=multiMenu.offsetWidth||200, mh=multiMenu.offsetHeight||130;
   multiMenu.style.left=Math.max(6,Math.min(W-mw-6, sx-mw/2))+"px";
   multiMenu.style.top =Math.max(10,Math.min(H-mh-6, sy-10))+"px";
 }
-function hideMultiMenu(){ multiMenu.style.display="none"; }
+function hideMultiMenu(){ multiMenu.style.display="none"; updateMenuBackdrop(); }
 function isMultiMenuOpen(){ return multiMenu.style.display==="block"; }
 
 // プロパティパネル（ノード長押しで表示・編集・削除）
@@ -2297,6 +2309,7 @@ function refreshProp(){
     numRow("Bullet Count", ()=>n.bulletCount||1, v=>{ n.bulletCount=Math.max(1,Math.round(v)); });
     numRow("Interval (F)", ()=>n.bulletInterval||0, v=>{ n.bulletInterval=Math.max(0,Math.round(v)); });
     numRow("Angle", ()=>n.angle||0, v=>{ n.angle=v; }); // 発射方向
+    chkRow("Dynamics", ()=>!!n.bulletDynamic, v=>{ n.bulletDynamic=v; }); // ON=弾が重力等の影響を受ける
   }
   // 幾何プロパティ（STICK/BUTTON/SHOTは独自UIなので除外）＝ Unity順: W/H → Angle → Color/Flip/Dynamics → Tag → Layer
   const hasGeom = d.object || d.stage==="text" || d.stage==="rotate";
@@ -2311,9 +2324,13 @@ function refreshProp(){
     colRow("Color", OBJ_COLORS, ()=>n.color, v=>{ n.color=v; });
     selRow("Style", [{value:"fill",label:"Fill"},{value:"frame",label:"Frame"}], ()=>n.objStyle||"fill", v=>{ n.objStyle=v; }); // ObjectStyle
     chkRow("Flip",     ()=>n.flip, v=>{ n.flip=v; });
-    // Dynamics: Unity RigidBody2D.bodyType 準拠（Off=物理無/Static=不動壁/Kinematic=速度で動く壁/Dynamic=重力あり）
-    selRow("Dynamics", [{value:"off",label:"OFF"},{value:"static",label:"STATIC"},{value:"kinematic",label:"KINEMATIC"},{value:"dynamic",label:"DYNAMIC"}],
-      ()=>n.bodyType||"static", v=>{ n.bodyType=v; });
+    if(n.type==="character"){ // キャラはDynamicsのOn/Offのみ（チェックボックス）
+      chkRow("Dynamics", ()=>(n.bodyType||"dynamic")==="dynamic", v=>{ n.bodyType = v?"dynamic":"off"; });
+    } else {
+      // Dynamics: Unity RigidBody2D.bodyType 準拠（Off=物理無/Static=不動壁/Kinematic=速度で動く壁/Dynamic=重力あり）
+      selRow("Dynamics", [{value:"off",label:"OFF"},{value:"static",label:"STATIC"},{value:"kinematic",label:"KINEMATIC"},{value:"dynamic",label:"DYNAMIC"}],
+        ()=>n.bodyType||"static", v=>{ n.bodyType=v; });
+    }
     selRow("Coord", [{value:"world",label:"World"},{value:"local",label:"Local"}], ()=>n.coordMode||"local", v=>{ n.coordMode=v; }); // 入力座標系
     chkRow("Visible", ()=>n.visible!==false, v=>{ n.visible=v; });
   }
@@ -2389,7 +2406,7 @@ function layoutPropPanel(pbody){
 // ▶ ボタン：Play中はタップで再生開始。停止は0.8秒の長押し（下から白く埋まるアニメ）
 (function(){
   const btn=document.getElementById("playBtn");
-  const HOLD_MS=800; let holdRaf=null, holdStart=0, holding=false;
+  const HOLD_MS=600; let holdRaf=null, holdStart=0, holding=false;
   function fillEl(){ return btn.querySelector(".holdfill"); }
   function resetFill(){ const f=fillEl(); if(f) f.style.height="0%"; }
   function tick(ts){ if(!holding) return; if(!holdStart) holdStart=ts;

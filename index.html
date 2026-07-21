@@ -26,8 +26,8 @@
   #flick { position:absolute; inset:0; z-index:11; display:none; }
   #flick .fi { position:absolute; width:105px; height:60px; border-radius:12px; display:flex; align-items:center;
     justify-content:center; font-size:18px; font-weight:800; color:#fff; border:2px solid rgba(255,255,255,.25);
-    background:#2b3140; box-shadow:0 6px 20px rgba(0,0,0,.5); }
-  #flick .fi.hot { border-color:#fff; transform:scale(1.08); }
+    background:#2b3140; box-shadow:0 6px 20px rgba(0,0,0,.5); box-sizing:border-box; white-space:nowrap; transition:transform .08s, filter .08s; }
+  #flick .fi.hot { border:4px solid #ffffff; filter:brightness(1.15) saturate(1.2); transform:scale(1.1); box-shadow:0 6px 20px rgba(0,0,0,.6); z-index:2; }
   .swatch { width:16px; height:16px; border-radius:4px; display:inline-block; margin-right:8px; vertical-align:-2px; }
 
   /* 再生中のオンスクリーン操作 */
@@ -136,6 +136,7 @@
     <button class="tbtn" id="texPaint">Paint</button>
     <button class="tbtn" id="texPick">Pick</button>
     <div id="texWork"></div>
+    <button class="tbtn" id="texView">View</button>
     <div id="texUndoRow">
       <button class="tbtn tsmall" id="texUndo">Undo</button>
       <button class="tbtn tsmall" id="texRedo">Redo</button>
@@ -1171,13 +1172,25 @@ function stageDepth(n){ let d=0,cur=n,g=0; while(cur.parentNodeId){ const p=node
 // aがbの祖先か（親子チェーン）
 function isAncestorOf(anc,node){ let cur=node,g=0; while(cur&&cur.parentNodeId){ if(cur.parentNodeId===anc.id) return true; cur=nodeById(cur.parentNodeId); if(g++>60)break; } return false; }
 function isRelatedHierarchy(a,b){ return a.id===b.id || isAncestorOf(a,b) || isAncestorOf(b,a); } // 親子・先祖子孫は衝突対象外
+function isScreenChild(n){
+  let cur=n, g=0;
+  while(cur && cur.parentNodeId){
+    const p=nodeById(cur.parentNodeId);
+    if(!p || g++>60) break;
+    if(p.type==="screen") return true;
+    cur=p;
+  }
+  return false;
+}
 // 子の「親ローカル座標（位置lx,ly・角度la）」を現在のレイアウトから計算・保持
 function recomputeLocal(c){ const p=nodeById(c.parentNodeId); if(!p) return;
+  if(p.type==="screen"){ c.lx=c.layoutX||0; c.ly=c.layoutY||0; c.la=c.angle||0; return; }
   const a=-(p.angle||0)*Math.PI/180, dx=(c.layoutX||0)-(p.layoutX||0), dy=(c.layoutY||0)-(p.layoutY||0);
   c.lx=dx*Math.cos(a)-dy*Math.sin(a); c.ly=dx*Math.sin(a)+dy*Math.cos(a); c.la=(c.angle||0)-(p.angle||0);
 }
 // 親ローカル→レイアウト絶対（親の回転・移動を反映）
 function worldFromParent(c){ const p=nodeById(c.parentNodeId); if(!p) return;
+  if(p.type==="screen"){ c.layoutX=c.lx||0; c.layoutY=c.ly||0; c.angle=c.la||0; return; }
   const a=(p.angle||0)*Math.PI/180, lx=c.lx||0, ly=c.ly||0;
   c.layoutX=(p.layoutX||0)+lx*Math.cos(a)-ly*Math.sin(a);
   c.layoutY=(p.layoutY||0)+lx*Math.sin(a)+ly*Math.cos(a);
@@ -1190,7 +1203,9 @@ function applyHierarchy(){
   const kids = nodes.filter(n=>(isStage(n)||attachesToObject(n)) && n.parentNodeId && nodeById(n.parentNodeId));
   kids.sort((a,b)=>stageDepth(a)-stageDepth(b));
   for(const n of kids){ const p=nodeById(n.parentNodeId);
-    const pa=(p.playAngle!=null?p.playAngle:(p.angle||0));  // 親の現在角度で回転追従
+    const pX = p.type==="screen" ? 0 : (p.playX!=null?p.playX:(p.layoutX||0));
+    const pY = p.type==="screen" ? 0 : (p.playY!=null?p.playY:(p.layoutY||0));
+    const pa = p.type==="screen" ? 0 : (p.playAngle!=null?p.playAngle:(p.angle||0));
     // 子オブジェクトのX/Y入力は親座標系でのオフセット（基準ローカル位置lx,lyに加算）
     let ox=0, oy=0;
     if(NODE_TYPES[n.type].object){
@@ -1198,8 +1213,8 @@ function applyHierarchy(){
       if(conns.some(c=>c.b===n.id&&c.bi===1)) oy=inputValue(n,1);
     }
     const a=pa*Math.PI/180, lx=(n.lx||0)+ox, ly=(n.ly||0)+oy;
-    n.playX = p.playX + lx*Math.cos(a)-ly*Math.sin(a);
-    n.playY = p.playY + lx*Math.sin(a)+ly*Math.cos(a);
+    n.playX = pX + lx*Math.cos(a)-ly*Math.sin(a);
+    n.playY = pY + lx*Math.sin(a)+ly*Math.cos(a);
     n.playAngle = pa + (n.la||0) + (n.type==="rotate"?(n._spin||0):0); // ROTATEは関節として自身の回転を加算
     if(n.type==="character") n.playAngle=n.angle||0; // キャラクターは親に追従しても回転しない（常に直立）
     // 親追従した子がMatter body を持つ場合は body 位置も同期（子は親に固定）
@@ -1229,10 +1244,15 @@ function parentPortPos(n){ return w2s(n.x, n.y - NS/2); } // 上：自分の親�
 function childPortPos(n){  return w2s(n.x, n.y + NS/2); } // 下：子を受け入れる端子
 function isCandidateParent(child,p){
   if(!child||!p||p.id===child.id||p.type==="shot") return false; // SHOTは子を受け入れない
+  if(child.type==="screen") return !!NODE_TYPES[p.type].object; // SCREEN自身が親オブジェクトを参照する場合
   if(readsParentObject(child)) return !!NODE_TYPES[p.type].object; // GETPOS/GETROTはオブジェクトへ
-  if(attachesToObject(child)) return !!NODE_TYPES[p.type].object; // TEXTURE/CONTACT/ONBREAKはオブジェクトへ
-  if(isStage(child)){ if(!isStage(p)) return false;
-    let cur=p,g=0; while(cur){ if(cur.id===child.id) return false; cur=nodeById(cur.parentNodeId); if(g++>60)break; } return true; }
+  if(attachesToObject(child)){
+    return !!NODE_TYPES[p.type].object || p.type==="screen"; // TEXTURE/CONTACT/ONBREAKはオブジェクトまたはSCREENへ
+  }
+  if(isStage(child)){
+    if(!isStage(p) && p.type!=="screen") return false; // 親はStageまたはSCREEN
+    let cur=p,g=0; while(cur){ if(cur.id===child.id) return false; cur=nodeById(cur.parentNodeId); if(g++>60)break; } return true;
+  }
   return false;
 }
 function drawWireV(p1,p2,color){
@@ -1332,7 +1352,7 @@ function drawNode(n){
   ctx.fillStyle = (d.object && nodeColorMode()==="display") ? n.color : d.color; ctx.fill();
   const sel = (selected===n.id) || multiSel.has(n.id);
   ctx.strokeStyle = sel?"#ffffff":"rgba(0,0,0,.4)";
-  ctx.lineWidth=sel?3:1.5; ctx.stroke();
+  ctx.lineWidth=sel?6:1.5; ctx.stroke();
   // 中央のシンボル（1〜3文字）をノードいっぱいに
   const g=nodeGlyph(n);
   const cx=tl.x+w/2, cy=tl.y+hh/2;
@@ -1414,6 +1434,29 @@ function objToLocal(n,sx,sy){ const p=screenToStageLayout(sx,sy), a=-(n.angle||0
   const dx=p.x-(n.layoutX||0), dy=p.y-(n.layoutY||0);
   return { x:dx*Math.cos(a)-dy*Math.sin(a), y:dx*Math.sin(a)+dy*Math.cos(a) }; }
 
+function drawOctagon(cx, cy, R) {
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI / 2 + Math.PI / 8 + i * Math.PI / 4;
+    const x = cx + R * Math.cos(a);
+    const y = cy + R * Math.sin(a);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+function sensorHasInnerNodes(n){
+  if(n.type!=="contact") return false;
+  const w=n.w||140, h=n.h||140;
+  return nodes.some(m => {
+    if(m.id===n.id || !showsInLayout(m)) return false;
+    const cp = objCenter(m);
+    const l = objToLocal(n, cp.x, cp.y);
+    return Math.abs(l.x) <= w/2 && Math.abs(l.y) <= h/2;
+  });
+}
+
 // ステージ要素（オブジェクト/テキスト/スティック/ボタン/SHOT/ROTATE）を描画
 function drawStage(cx,cy,n,ang){
   const d=NODE_TYPES[n.type];
@@ -1434,19 +1477,48 @@ function drawStage(cx,cy,n,ang){
     else { ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillText(txt, ax+2, 2); } // 通常は影
     ctx.fillStyle=n.textColor||"#ffffff"; ctx.fillText(txt, ax, 0);
   } else if(d.stage==="stick"){
-    const R=Math.min(w,h)/2; const col=n.color||"#e0892b"; const style=n.style||"frame";
-    // FRAME/FILL は外側リングを描く。INNER は外側なし（内側の丸だけ）
-    if(style!=="inner"){ ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke(); }
-    // 内側の丸（ノブ）：FILL=塗り / FRAME・INNER=線のみ
-    const kx=(n.stickX||0)*R*0.55, ky=(n.stickY||0)*R*0.55, kr=R*0.4;
-    ctx.beginPath(); ctx.arc(kx,ky,kr,0,7); ctx.strokeStyle=col; ctx.lineWidth=3;
-    if(style==="fill"){ ctx.fillStyle=col; ctx.fill(); } else { ctx.stroke(); }
+    const style=n.style||"frame";
+    if(style!=="off"){
+      const R_max=Math.min(w,h)/2;
+      const R=R_max*0.7; // 外枠（円/八角形）の半径を引き締まった70%サイズに
+      const col=n.color||"#e0892b";
+      const isOct = (style==="frame_oct" || style==="fill_oct" || style==="inner_rect");
+      if(style!=="inner" && style!=="inner_rect"){
+        if(isOct){
+          drawOctagon(0, 0, R);
+          ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
+        } else {
+          ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
+        }
+      }
+      // スティックを一番端に倒した時(stick=1.0)に外枠線の上にノブの中心(kx,ky)がぴったり重なる
+      const kx=(n.stickX||0)*R, ky=(n.stickY||0)*R, kr=R*0.4;
+      if(isOct){
+        const krOct=kr*0.8;
+        ctx.beginPath(); ctx.rect(kx-krOct, ky-krOct, krOct*2, krOct*2);
+        ctx.strokeStyle=col; ctx.lineWidth=3;
+        if(style==="fill_oct"){ ctx.fillStyle=col; ctx.fill(); }
+        ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(kx,ky,kr,0,7); ctx.strokeStyle=col; ctx.lineWidth=3;
+        if(style==="fill"){ ctx.fillStyle=col; ctx.fill(); } else { ctx.stroke(); }
+      }
+    }
   } else if(d.stage==="button"){
-    const col=n.color||"#e0892b"; const fill=(n.style||"frame")==="fill";
-    roundRect(-w/2,-h/2,w,h,14);
-    // FILL=塗り / FRAME=枠だけ（押下時のみハイライト塗り）
-    if(fill || n.pressed){ ctx.globalAlpha = n.pressed ? 0.9 : 0.6; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1; }
-    ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
+    const style=n.style||"frame";
+    if(style!=="off"){
+      const col=n.color||"#e0892b"; const isFill=style.startsWith("fill");
+      ctx.beginPath();
+      if(style==="frame_circle" || style==="fill_circle"){
+        const R=Math.min(w,h)/2; ctx.arc(0,0,R,0,7);
+      } else if(style==="frame_rect" || style==="fill_rect"){
+        ctx.rect(-w/2,-h/2,w,h);
+      } else {
+        roundRect(-w/2,-h/2,w,h,14);
+      }
+      if(isFill || n.pressed){ ctx.globalAlpha = n.pressed ? 0.9 : 0.6; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1; }
+      ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
+    }
   } else if(d.stage==="shot"){ // 発射口（三角）
     ctx.fillStyle=n.color; ctx.beginPath(); ctx.moveTo(0,-h/2); ctx.lineTo(w/2,h/2); ctx.lineTo(-w/2,h/2); ctx.closePath(); ctx.fill();
   } else if(d.stage==="rotate"){ // 回転ピボット（Play中は非表示）
@@ -1463,8 +1535,12 @@ function drawStage(cx,cy,n,ang){
       if(n.type==="contact"||n.type==="onbreak"){ ctx.strokeRect(-w/2,-h/2,w,h); } // SENSOR/ONBREAKは矩形マーカー(ONBREAKは正方形=エフェクト範囲)
       else { ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke(); }
       ctx.setLineDash([]);
-      ctx.fillStyle=col; ctx.font=`800 ${Math.round(R*0.7)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
-      ctx.fillText(nodeGlyph(n), 0, 0); }
+      const hideText = sensorHasInnerNodes(n);
+      if(!hideText){
+        ctx.fillStyle=col; ctx.font=`800 ${Math.round(R*0.7)}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText(nodeGlyph(n), 0, 0);
+      }
+    }
   }
   ctx.restore();
 }
@@ -1538,12 +1614,13 @@ function drawPlay(){
   ctx.fillStyle = bgNode ? (bgNode.color||"#0a0b10") : "#0a0b10"; ctx.fillRect(0,0,W,H);
   const camX=playCam.x, camY=playCam.y, camS=(playCam.s||1)*computeResScale();
   const uiTypes = new Set(["stick","button"]);
+  const isUI = n => uiTypes.has(n.type) || isScreenChild(n);
   const drawList = nodes.filter(n=>(isStage(n) || (n.type==="texture" && !texHasParent(n))) && !destroyed.has(n.id) // 未割当TEXTUREも表示
     && n.type!=="shot"                                                  // SHOT本体（発射口）はPlayに出さない
     && !((n.type==="stick"||n.type==="button") && uiCtrlHidden(n))
     && !objHidden(n));
   drawList.sort((a,b)=>(a.layer||50)-(b.layer||50));
-  const worldList=drawList.filter(n=>!uiTypes.has(n.type)), uiList=drawList.filter(n=>uiTypes.has(n.type));
+  const worldList=drawList.filter(n=>!isUI(n)), uiList=drawList.filter(n=>isUI(n));
   // ワールド層（SCREENのScaleを画面中央基準で適用）
   ctx.save(); ctx.translate(W/2,H/2); ctx.scale(camS,camS); ctx.translate(-W/2,-H/2);
   for(const n of worldList) drawStage(W/2+n.playX+camX, H/2+n.playY+camY, n, (n.playAngle!=null?n.playAngle:n.angle));
@@ -1621,7 +1698,17 @@ function hitLayoutObject(sx,sy){
     .sort((a,b)=>((b.layer||50)-(a.layer||50)) || (nodes.indexOf(b)-nodes.indexOf(a))); // Layer降順→後勝ち
   for(const n of list){
     const l=objToLocal(n,sx,sy);
-    if(Math.abs(l.x)<=(n.w||80)/2 && Math.abs(l.y)<=(n.h||80)/2) return n;
+    const w=n.w||80, h=n.h||80;
+    if(n.type==="contact" && sensorHasInnerNodes(n)){
+      const margin = Math.max(16, 24 / layoutView.s);
+      const outerW = w/2 + margin, outerH = h/2 + margin;
+      const innerW = w/2 - margin, innerH = h/2 - margin;
+      const inOuter = Math.abs(l.x) <= outerW && Math.abs(l.y) <= outerH;
+      const inInner = (innerW > 0 && innerH > 0) && (Math.abs(l.x) < innerW && Math.abs(l.y) < innerH);
+      if(inOuter && !inInner) return n;
+    } else {
+      if(Math.abs(l.x)<=w/2 && Math.abs(l.y)<=h/2) return n;
+    }
   }
   return null;
 }
@@ -1845,9 +1932,9 @@ function playDown(pid,sx,sy){
     if(!(d.stage==="stick"||d.stage==="button")) continue;
     if(uiCtrlHidden(n)) continue;
     const l=playObjToLocal(n,sx,sy); const R=Math.min(n.w||150,n.h||150)/2;
-    const hit = (d.stage==="stick") ? (Math.hypot(l.x,l.y)<=R) : (Math.abs(l.x)<=(n.w||150)/2 && Math.abs(l.y)<=(n.h||150)/2);
+    const hit = (d.stage==="stick") ? (Math.hypot(l.x,l.y)<=R) : (n.style==="frame_circle"||n.style==="fill_circle") ? (Math.hypot(l.x,l.y)<=R) : (Math.abs(l.x)<=(n.w||150)/2 && Math.abs(l.y)<=(n.h||150)/2);
     if(hit){
-      if(d.stage==="stick"){ n.stickPid=pid; updateStick(n,l,R); }
+      if(d.stage==="stick"){ n.stickPid=pid; updateStick(n,l,R*0.7); }
       else { n.btnPid=pid; n.pressed=1; }
       return;
     }
@@ -1872,7 +1959,7 @@ function playObjToLocal(n,sx,sy){ const a=-((n.playAngle!=null?n.playAngle:(n.an
 function playMove(pid,sx,sy){
   const rs=computeResScale(); touchX=(sx-W/2)/rs; touchY=(sy-H/2)/rs;
   for(const n of nodes){ const d=NODE_TYPES[n.type];
-    if(d.stage==="stick" && n.stickPid===pid){ const R=Math.min(n.w||150,n.h||150)/2; updateStick(n,playObjToLocal(n,sx,sy),R); }
+    if(d.stage==="stick" && n.stickPid===pid){ const R=(Math.min(n.w||150,n.h||150)/2)*0.7; updateStick(n,playObjToLocal(n,sx,sy),R); }
   }
 }
 function playUp(pid){
@@ -1884,7 +1971,11 @@ function playUp(pid){
 }
 
 // ===== テクスチャエディタ =====
-let texEditNode=null, texColor="#ffffff", texMode="draw", texPressed=false, texGeom=null; // texMode: draw / erase / pick / paint
+let texEditNode=null, texColor="#ffffff", texMode="draw", texPressed=false, texGeom=null; // texMode: draw / erase / pick / paint / view
+let texViewScale=1.0, texViewX=0, texViewY=0; // Viewモード用ズーム・パン（最小1.0で(0,0)にリセット）
+let texPanLast=null;
+function resetTexView(){ texViewScale=1.0; texViewX=0; texViewY=0; texPanLast=null; }
+
 // テクスチャエディタ専用UNDO/REDO（メインとは独立・最大30手）
 let texUndoStack=[], texRedoStack=[];
 function texRecordUndo(){ const n=nodeById(texEditNode); if(!n) return; texUndoStack.push(n.pixels.slice()); if(texUndoStack.length>30) texUndoStack.shift(); texRedoStack.length=0; }
@@ -1894,11 +1985,12 @@ function texRedo(){ const n=nodeById(texEditNode); if(!n||!texRedoStack.length) 
 let texWork=["#ffffff","#000000","#ff5a5a","#3ba7ff"];
 let texSel=0;
 function updateTexModeUI(){
-  const d=document.getElementById("texDraw"), e=document.getElementById("texErase"), pk=document.getElementById("texPick"), pt=document.getElementById("texPaint");
+  const d=document.getElementById("texDraw"), e=document.getElementById("texErase"), pk=document.getElementById("texPick"), pt=document.getElementById("texPaint"), vw=document.getElementById("texView");
   if(d) d.classList.toggle("active", texMode==="draw");
   if(e) e.classList.toggle("active", texMode==="erase");
   if(pt) pt.classList.toggle("active", texMode==="paint");
   if(pk) pk.classList.toggle("active", texMode==="pick");
+  if(vw) vw.classList.toggle("active", texMode==="view");
 }
 function buildTexWork(){
   const cont=document.getElementById("texWork"); if(!cont) return; cont.innerHTML="";
@@ -1920,14 +2012,14 @@ function resizeTexture(n,newN){ const oldN=n.texW||16; if(newN===oldN) return;
   n.texW=newN; n.texH=newN; n.pixels=np;
 }
 function openTexEditor(id){ texEditNode=id; mode="texedit"; propNode=null; refreshProp();
-  texUndoStack=[]; texRedoStack=[]; // エディタ開始時にテクスチャUNDOをリセット
+  texUndoStack=[]; texRedoStack=[]; resetTexView(); // エディタ開始時にテクスチャUNDOとView変換をリセット
   buildTexWork(); texColor=texWork[texSel]; texMode="draw"; updateTexModeUI();
   document.getElementById("texBar").style.display="flex";
   document.getElementById("texCloseBtn").style.display="block";
   document.getElementById("menuBtn").style.display="none";
   document.getElementById("playBtn").style.display="none";
 }
-function closeTexEditor(){ texEditNode=null; mode="edit";
+function closeTexEditor(){ texEditNode=null; mode="edit"; resetTexView();
   document.getElementById("texBar").style.display="none";
   document.getElementById("texCloseBtn").style.display="none";
   document.getElementById("menuBtn").style.display="flex";
@@ -1939,8 +2031,10 @@ function drawTexEditor(){
   const N=n.texW||16;
   const leftPad=104; // 左のツールパネル分をあける
   const avail=Math.min(W-leftPad-24, H-70);
-  const cell=Math.floor(avail/N), size=cell*N;
-  const ox=leftPad + Math.floor((W-leftPad-size)/2), oy=Math.floor((H-size)/2)+8;
+  const baseCell=Math.floor(avail/N), baseSize=baseCell*N;
+  const baseOx=leftPad + Math.floor((W-leftPad-baseSize)/2), baseOy=Math.floor((H-baseSize)/2)+8;
+  const cell=baseCell*texViewScale, size=cell*N;
+  const ox=baseOx+texViewX, oy=baseOy+texViewY;
   for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const px=ox+x*cell, py=oy+y*cell;
     ctx.fillStyle=((x+y)&1)?"#20242e":"#171a22"; ctx.fillRect(px,py,cell,cell);  // 透明チェッカー
     const col=n.pixels[y*N+x]; if(col){ ctx.fillStyle=col; ctx.fillRect(px,py,cell,cell); } }
@@ -1975,6 +2069,7 @@ document.getElementById("texDraw").onclick=()=>{ texMode="draw"; updateTexModeUI
 document.getElementById("texErase").onclick=()=>{ texMode="erase"; updateTexModeUI(); };
 document.getElementById("texPaint").onclick=()=>{ texMode="paint"; updateTexModeUI(); };
 document.getElementById("texPick").onclick=()=>{ texMode="pick"; updateTexModeUI(); };
+document.getElementById("texView").onclick=()=>{ texMode="view"; updateTexModeUI(); };
 document.getElementById("texUndo").onclick=()=>{ texUndo(); };
 document.getElementById("texRedo").onclick=()=>{ texRedo(); };
 document.getElementById("texCloseBtn").onclick=closeTexEditor;
@@ -2033,29 +2128,77 @@ function doPinch(){
   }
   pinchPrev={dist,mx,my};
 }
+function doTexPinch(){
+  const pts=[...ptrs.values()]; if(pts.length<2) return;
+  const a=pts[0], b=pts[1];
+  const dist=Math.hypot(a.x-b.x, a.y-b.y);
+  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+  if(pinchPrev){
+    const ratio = dist / pinchPrev.dist;
+    const oldScale = texViewScale;
+    let newScale = oldScale * ratio;
+    if(newScale <= 1.0){
+      texViewScale = 1.0;
+      texViewX = 0;
+      texViewY = 0;
+    } else {
+      newScale = Math.min(8.0, newScale);
+      const dx = mx - pinchPrev.mx;
+      const dy = my - pinchPrev.my;
+      const oxOffset = 104 + (W - 104)/2;
+      texViewScale = newScale;
+      texViewX = (texViewX - (mx - oxOffset)) * (newScale / oldScale) + (mx - oxOffset) + dx;
+      texViewY = (texViewY - (my - H/2)) * (newScale / oldScale) + (my - H/2) + dy;
+    }
+  }
+  pinchPrev = {dist, mx, my};
+}
 cv.addEventListener("pointerdown", e=>{ cv.setPointerCapture(e.pointerId);
   if(mode==="play"){ playDown(e.pointerId,e.clientX,e.clientY); return; }
-  if(mode==="texedit"){ texPressed=true; if(texMode!=="paint") texRecordUndo(); texPaint(e.clientX,e.clientY); return; }
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(mode==="texedit"){
+    if(texMode!=="view"){
+      texPressed=true; if(texMode!=="paint") texRecordUndo(); texPaint(e.clientX,e.clientY);
+    } else {
+      texPanLast = {x:e.clientX, y:e.clientY};
+      pinchPrev = null;
+    }
+    return;
+  }
   lastPtr={x:e.clientX,y:e.clientY}; _edgeArmed=false; // 端スクロール用の位置を初期化（初回誤発火防止）
   if((mode==="edit"||mode==="layout") && ptrs.size>=2){ drag=null; cancelLongPress(); pinchPrev=null; return; }
   onDown(e.clientX,e.clientY); });
 cv.addEventListener("pointermove", e=>{
   if(mode==="play"){ playMove(e.pointerId,e.clientX,e.clientY); return; }
-  if(mode==="texedit"){ if(texPressed) texPaint(e.clientX,e.clientY); return; }
   if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(mode==="texedit"){
+    if(texMode!=="view"){
+      if(texPressed) texPaint(e.clientX,e.clientY);
+    } else {
+      if(ptrs.size>=2){
+        doTexPinch();
+      } else if(ptrs.size===1 && texPanLast){
+        if(texViewScale > 1.0){
+          texViewX += e.clientX - texPanLast.x;
+          texViewY += e.clientY - texPanLast.y;
+        }
+        texPanLast = {x:e.clientX, y:e.clientY};
+      }
+    }
+    return;
+  }
   if((mode==="edit"||mode==="layout") && ptrs.size>=2){ doPinch(); return; }
   onMove(e.clientX,e.clientY); });
 cv.addEventListener("pointerup",   e=>{
   if(mode==="play"){ playUp(e.pointerId); return; }
+  ptrs.delete(e.pointerId); pinchPrev=null; _edgeArmed=false; texPanLast=null;
   if(mode==="texedit"){ texPressed=false; return; }
-  ptrs.delete(e.pointerId); pinchPrev=null; _edgeArmed=false;
   onUp(e.clientX,e.clientY); });
-cv.addEventListener("pointercancel", e=>{ ptrs.delete(e.pointerId); pinchPrev=null;
+cv.addEventListener("pointercancel", e=>{ ptrs.delete(e.pointerId); pinchPrev=null; texPanLast=null;
   if(mode==="play"){ playUp(e.pointerId); return; } texPressed=false; drag=null; cancelLongPress();});
-// wheel zoom（Editor と Layout）
+// wheel zoom（Editor, Layout, TexEdit View）
 cv.addEventListener("wheel", e=>{ e.preventDefault();
-  const f = e.deltaY<0?1.2:0.8; // 変化量を倍に（±0.1→±0.2相当）
+  const f = e.deltaY<0?1.25:0.8;
   if(mode==="edit"){
     const before=s2w(e.clientX,e.clientY);
     view.s=Math.min(3,Math.max(0.15,view.s*f)); // ズームアウト限界を拡大（0.3→0.15）
@@ -2066,6 +2209,18 @@ cv.addEventListener("wheel", e=>{ e.preventDefault();
     layoutView.s=Math.min(3,Math.max(0.075,layoutView.s*f));
     const after=screenToStageLayout(e.clientX,e.clientY);
     layoutView.x+=before.x-after.x; layoutView.y+=before.y-after.y;
+  } else if(mode==="texedit" && texMode==="view"){
+    const oldScale = texViewScale;
+    let newScale = texViewScale * f;
+    if(newScale <= 1.0){
+      texViewScale = 1.0; texViewX = 0; texViewY = 0;
+    } else {
+      newScale = Math.min(8.0, newScale);
+      const mx = e.clientX, my = e.clientY, oxOffset = 104 + (W - 104)/2;
+      texViewScale = newScale;
+      texViewX = (texViewX - (mx - oxOffset)) * (newScale / oldScale) + (mx - oxOffset);
+      texViewY = (texViewY - (my - H/2)) * (newScale / oldScale) + (my - H/2);
+    }
   }
 },{passive:false});
 
@@ -2265,8 +2420,17 @@ function refreshProp(){
     colRow("Color", OBJ_COLORS, ()=>n.textColor||"#ffffff", v=>{ n.textColor=v; });
     chkRow("Outline", ()=>n.outline, v=>{ n.outline=v; });
   }
-  const STYLE_OPTS=[{value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},{value:"off",label:"OFF"}];
-  const STICK_STYLE_OPTS=[{value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},{value:"inner",label:"INNER"},{value:"off",label:"OFF"}];
+  const BTN_STYLE_OPTS=[
+    {value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},
+    {value:"frame_circle",label:"FRAME CIRCLE"},{value:"fill_circle",label:"FILL CIRCLE"},
+    {value:"frame_rect",label:"FRAME RECT"},{value:"fill_rect",label:"FILL RECT"},
+    {value:"off",label:"OFF"}
+  ];
+  const STICK_STYLE_OPTS=[
+    {value:"frame",label:"FRAME"},{value:"fill",label:"FILL"},{value:"inner",label:"INNER"},
+    {value:"frame_oct",label:"FRAME OCT"},{value:"fill_oct",label:"FILL OCT"},{value:"inner_rect",label:"INNER RECT"},
+    {value:"off",label:"OFF"}
+  ];
   const KEYMODE_OPTS=[{value:"off",label:"Off"},{value:"wasd",label:"WASD"},{value:"ijkl",label:"IJKL"},{value:"cursor",label:"Cursor"},{value:"8462",label:"8462"}];
   const CNTL_OPTS=[{value:"off",label:"Off"},{value:"lstick",label:"L-Stick"},{value:"rstick",label:"R-Stick"},{value:"dpad",label:"DPAD"}];
   const BTN_CNTL_OPTS=[{value:"off",label:"Off"},{value:"a",label:"A"},{value:"b",label:"B"},{value:"x",label:"X"},{value:"y",label:"Y"},
@@ -2285,7 +2449,7 @@ function refreshProp(){
     chkRow("Hide on PC", ()=>n.hideOnPc, v=>{ n.hideOnPc=v; });
   }
   if(n.type==="button"){
-    selRow("Style",  STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
+    selRow("Style",  BTN_STYLE_OPTS, ()=>n.style||"frame", v=>{ n.style=v; });
     colRow("Color",  OBJ_COLORS, ()=>n.color||"#e0892b", v=>{ n.color=v; });
     numRow("Width",  ()=>n.w||150, v=>{ n.w=Math.max(24,v); }); // Unity: RECT WIDTH/HEIGHT
     numRow("Height", ()=>n.h||150, v=>{ n.h=Math.max(24,v); });
@@ -2479,22 +2643,21 @@ function refreshProp(){
 }
 // プロパティを画面に収める：はみ出たら2列、それでも/縦画面で収まらなければpbodyをスクロール
 function layoutPropPanel(pbody){
-  // まず1列でリセット。パネル幅は画面向きに追従（縦=狭め/横=広め）だが画面幅を超えない
+  // まず1列でリセット。パネル幅は画面向きに追従（縦=狭め/横=広め）だが画面幅の90%を超えない（左右5%余白）
   pbody.style.gridTemplateColumns="1fr"; pbody.style.gridTemplateRows=""; pbody.style.gridAutoFlow="row"; pbody.style.maxHeight=""; pbody.style.overflowY=""; pbody.style.background=""; pbody.style.columnGap="16px";
   const landscape = W>H;
-  const maxPanel = W - 16;                       // 画面幅からはみ出さない上限
-  const base1 = landscape ? 300 : 240;           // 1列時の目安幅
+  const maxPanel = Math.floor(W * 0.9);          // 左右5%ずつ残す（最大幅90%）
+  const base1 = landscape ? 260 : 230;           // 1列時の目安幅
   propPanel.style.minWidth = Math.min(base1, maxPanel)+"px"; propPanel.style.maxWidth = maxPanel+"px";
   const avail = H - 24;
   if(propPanel.offsetHeight > avail){ // 2列化（列優先＝左列に上から下、続きを右列の上から下）
-    const gap = 20; pbody.style.columnGap=gap+"px";
+    const gap = 16; pbody.style.columnGap=gap+"px";
     const rows = Math.ceil(pbody.children.length/2); // 左列の行数（上半分を左、残りを右）
     pbody.style.gridTemplateColumns="1fr 1fr"; pbody.style.gridTemplateRows=`repeat(${rows}, auto)`;
     pbody.style.gridAutoFlow="column"; // 縦方向に詰めてから次の列へ
-    // 2列に必要な幅：1列分の実測×2＋gap＋パネル左右padding。画面幅内に収める
     const pad = propPanel.offsetWidth - pbody.offsetWidth; // パネルの左右余白
-    const oneCol = Math.max(base1, pbody.scrollWidth); // 1列の内容幅
-    let want = oneCol*2 + gap + pad + 12;
+    const targetColW = landscape ? 210 : 185;      // 2列時の1列あたりの適正目標幅
+    let want = targetColW * 2 + gap + pad + 8;
     want = Math.min(want, maxPanel);
     propPanel.style.minWidth = want+"px";
     // 中央の薄い罫線（等幅列なので pbody の中心＝列の隙間の中心）
@@ -2667,7 +2830,7 @@ function openAppSettings(){ modal((box,close)=>{
     row.appendChild(lb); row.appendChild(sel); box.appendChild(row);
   };
   appSel("Wire", [{value:"curve",label:"Curve"},{value:"straight",label:"Straight"}], "wireStyle", "curve");
-  appSel("NodeColor", [{value:"basic",label:"Basic"},{value:"display",label:"Display"}], "nodeColor", "basic");
+  appSel("NodeColor", [{value:"basic",label:"Basic"},{value:"display",label:"Play Color"}], "nodeColor", "basic");
 }); }
 function openSaveDialog(){ modal((box,close)=>{
   const t=document.createElement("div"); t.textContent="SAVE"; t.style.cssText="color:#fff;font-size:18px;font-weight:800;margin-bottom:12px"; box.appendChild(t);

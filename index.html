@@ -126,8 +126,8 @@
   <div id="layerCtrl">
     <div id="layerValText">50</div>
     <div id="layerBtnRow">
-      <button id="layerDownBtn" class="lbtn">▽</button>
       <button id="layerUpBtn" class="lbtn">△</button>
+      <button id="layerDownBtn" class="lbtn">▽</button>
     </div>
   </div>
   <div id="flick"></div>
@@ -1578,13 +1578,12 @@ function drawLayout(){
   // 中央十字ガイド
   ctx.strokeStyle="#2a313d"; ctx.lineWidth=1/S;
   ctx.beginPath(); ctx.moveTo(0,-H/2); ctx.lineTo(0,H/2); ctx.moveTo(-W/2,0); ctx.lineTo(W/2,0); ctx.stroke();
-  // ステージ要素＋付随ノード（ステージ座標で描画）。オブジェクトノード(0)を先、非オブジェクトノード(1)を最前面に描画
-  const isObjNode = n => !!NODE_TYPES[n.type].object;
+  // ステージ要素＋付随ノード（ステージ座標で描画）。Layer昇順で描画（Layer値が大きいものが前面）
   const layoutList = nodes.filter(showsInLayout).slice().sort((a,b)=>{
-    const aObj = isObjNode(a) ? 0 : 1;
-    const bObj = isObjNode(b) ? 0 : 1;
-    if(aObj !== bObj) return aObj - bObj;
-    return (a.layer||50) - (b.layer||50);
+    const la = a.layer != null ? a.layer : (a.type==="texture"?10:50);
+    const lb = b.layer != null ? b.layer : (b.type==="texture"?10:50);
+    if(la !== lb) return la - lb;
+    return nodes.indexOf(a) - nodes.indexOf(b);
   });
   for(const n of layoutList){ drawStage(n.layoutX||0, n.layoutY||0, n); }
   ctx.restore();
@@ -1720,15 +1719,13 @@ let portArmTimer=null;
 function cancelPortArm(){ if(portArmTimer){ clearTimeout(portArmTimer); portArmTimer=null; } }
 
 // レイアウト画面：オブジェクトの当たり判定（最前面順の全ノードリスト）
-// オブジェクトノード以外（Sensor, Onbreak, Rotate等）は最前面
 function hitLayoutObjectList(sx,sy){
-  const isObj = n => !!NODE_TYPES[n.type].object;
   const list=nodes.filter(showsInLayout).slice()
     .sort((a,b)=>{
-      const aObj = isObj(a) ? 0 : 1;
-      const bObj = isObj(b) ? 0 : 1;
-      if(aObj !== bObj) return bObj - aObj; // 非オブジェクト(1)が先(前面)、オブジェクト(0)が後
-      return ((b.layer||50)-(a.layer||50)) || (nodes.indexOf(b)-nodes.indexOf(a)); // Layer降順
+      const la = a.layer != null ? a.layer : (a.type==="texture"?10:50);
+      const lb = b.layer != null ? b.layer : (b.type==="texture"?10:50);
+      if(la !== lb) return lb - la; // Layer降順（大きいものが前面＝優先ヒット）
+      return nodes.indexOf(b) - nodes.indexOf(a);
     });
   const hits = [];
   for(const n of list){

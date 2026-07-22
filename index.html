@@ -3153,11 +3153,15 @@ function updateSubModeBtnUI(){
   if(mode === "edit"){
     sb.style.display = "flex";
     sb.textContent = "LAYOUT";
+    sb.style.fontSize = "17px";
+    sb.style.letterSpacing = "-0.5px";
     sb.style.background = "#21b3d6";
     sb.style.borderColor = "#2a91ad";
   } else if(mode === "layout"){
     sb.style.display = "flex";
     sb.textContent = "NODE";
+    sb.style.fontSize = "19px";
+    sb.style.letterSpacing = "0.02em";
     sb.style.background = "#1f7a3a";
     sb.style.borderColor = "#2ab356";
   } else {
